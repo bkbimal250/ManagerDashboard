@@ -1,673 +1,346 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Button } from '../../Components';
+import React, { useState, useMemo } from 'react';
 import { 
-  Clock, 
   Users, 
-  Calendar,
-  Eye,
-  Download,
-  Filter,
-  ChevronLeft,
-  ChevronRight,
-  Wifi,
-  WifiOff,
-  Bell
+  Clock, 
+  Calendar, 
+  TrendingUp, 
+  TrendingDown,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  User,
+  Search,
+  Filter
 } from 'lucide-react';
-import api from '../../services/api';
-import realtimeAttendanceService from '../../services/realtimeAttendance';
-import { formatDateWithDay, formatTime } from '../../utils/dateUtils';
+import { Button } from '../index';
 
-const AttendanceOverview = ({ onViewEmployee }) => {
-  const [attendance, setAttendance] = useState([]);
-  const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [selectedEmployee, setSelectedEmployee] = useState('');
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [viewMode, setViewMode] = useState('today'); // today, date, employee, monthly
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  const [stats, setStats] = useState({
-    present: 0,
-    absent: 0,
-    late: 0,
-    total: 0
-  });
-  const [isRealtimeActive, setIsRealtimeActive] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState(null);
-  const [fingerprintNotifications, setFingerprintNotifications] = useState([]);
-  const [zktecoDeviceStatus, setZktecoDeviceStatus] = useState(null);
+const AttendanceOverview = ({ 
+  onViewEmployee, 
+  attendanceData = [], 
+  todayAttendance = [], 
+  attendanceStats = {},
+  filters = {},
+  onFilterChange = () => {}
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
-  useEffect(() => {
-    fetchEmployees();
-  }, []);
-
-  useEffect(() => {
-    fetchAttendance();
-  }, [currentPage, selectedEmployee, selectedDate, viewMode, currentMonth, currentYear]);
-
-  // Real-time attendance monitoring
-  useEffect(() => {
-    const startRealtimeMonitoring = () => {
-      realtimeAttendanceService.startPolling({
-        interval: 5000, // 5 seconds
-        onAttendanceUpdate: (data) => {
-          // Handle combined data from regular attendance and ZKTeco devices
-          const attendanceData = data.regular || data;
-          setAttendance(attendanceData);
-          calculateStats(attendanceData);
-          setLastUpdate(new Date());
-          
-          // Log ZKTeco device status
-          if (data.zkteco && data.zkteco.deviceStatus) {
-            console.log('ZKTeco Device Status:', data.zkteco.deviceStatus);
-            setZktecoDeviceStatus(data.zkteco.deviceStatus);
-          }
-        },
-        onFingerprintDetected: (changes) => {
-          // Add fingerprint notifications
-          const newNotifications = Array.isArray(changes) ? changes.map(change => {
-            let message = '';
-            let icon = 'fingerprint';
-            
-            switch (change.type) {
-              case 'check_in':
-                message = `${change.userName} checked in at ${formatTime(change.timestamp)}`;
-                icon = 'check-in';
-                break;
-              case 'check_out':
-                message = `${change.userName} checked out at ${formatTime(change.timestamp)}`;
-                icon = 'check-out';
-                break;
-              case 'zkteco_sync':
-                message = change.message;
-                icon = 'device-sync';
-                break;
-              case 'device_online':
-                message = change.message;
-                icon = 'device-online';
-                break;
-              default:
-                message = `${change.userName} ${change.type} at ${formatTime(change.timestamp)}`;
-                icon = 'fingerprint';
-            }
-            
-            return {
-              id: Date.now() + Math.random(),
-              type: change.type,
-              message: message,
-              timestamp: change.timestamp,
-              icon: icon,
-              data: change
-            };
-          }) : [];
-          
-          setFingerprintNotifications(prev => [...newNotifications, ...prev].slice(0, 10)); // Keep last 10 notifications
-        },
-        onError: (error) => {
-          console.error('Real-time attendance error:', error);
-        }
-      });
-      
-      setIsRealtimeActive(true);
-    };
-
-    // Start real-time monitoring when component mounts
-    startRealtimeMonitoring();
-
-    // Cleanup on unmount
-    return () => {
-      realtimeAttendanceService.stopPolling();
-      setIsRealtimeActive(false);
-    };
-  }, []);
-
-  const fetchEmployees = async () => {
-    try {
-      const response = await api.getManagerEmployees();
-      console.log('Employees API Response:', response); // Debug log
-      
-      // Handle different response structures
-      let employeesData = [];
-      if (Array.isArray(response)) {
-        employeesData = response;
-      } else if (response && response.results && Array.isArray(response.results)) {
-        employeesData = response.results;
-      } else if (response && response.employees && Array.isArray(response.employees)) {
-        employeesData = response.employees;
-      } else if (response && typeof response === 'object') {
-        // If response is an object but not the expected structure, try to extract data
-        employeesData = Object.values(response).find(val => Array.isArray(val)) || [];
-      } else {
-        employeesData = [];
-      }
-      
-      console.log('Extracted employeesData:', employeesData); // Debug log
-      setEmployees(employeesData);
-    } catch (error) {
-      console.error('Failed to fetch employees:', error);
-      setEmployees([]); // Ensure it's always an array
-    }
-  };
-
-  const fetchAttendance = async () => {
-    try {
-      setLoading(true);
-      let response;
-      
-      const params = {
-        page: currentPage,
-        limit: 20 // Limit per page to prevent bulk data
-      };
-
-      if (viewMode === 'today') {
-        response = await api.getTodayAttendance(params);
-      } else if (viewMode === 'date') {
-        response = await api.getManagerAttendance({
-          ...params,
-          date: selectedDate
-        });
-      } else if (viewMode === 'employee' && selectedEmployee) {
-        response = await api.getEmployeeAttendance(selectedEmployee, {
-          ...params,
-          date: selectedDate
-        });
-      } else if (viewMode === 'monthly') {
-        // Get attendance for the selected month using the new backend endpoint
-        response = await api.getMonthlyAttendance(currentMonth + 1, currentYear, params);
-      } else {
-        response = await api.getManagerAttendance(params);
-      }
-      
-      // Handle different response structures based on view mode
-      if (viewMode === 'monthly' && response.attendance_records) {
-        // New monthly endpoint returns structured data
-        setAttendance(response.attendance_records);
-        setStats({
-          present: response.statistics.present_days,
-          absent: response.statistics.absent_days,
-          late: response.statistics.late_days,
-          total: response.statistics.total_days_in_month
-        });
-        // No pagination for monthly view as it returns all records for the month
-        setTotalPages(1);
-      } else if (viewMode === 'today' && response.attendance_records) {
-        // New today endpoint returns structured data
-        setAttendance(response.attendance_records);
-        setStats({
-          present: response.statistics.present_records,
-          absent: response.statistics.absent_records,
-          late: response.statistics.late_records,
-          total: response.statistics.total_records
-        });
-        // No pagination for today view as it's just today's data
-        setTotalPages(1);
-      } else {
-        // Handle other view modes with existing logic
-        const attendanceData = response.results || response;
-        setAttendance(attendanceData);
-        
-        // Calculate stats from the actual attendance records
-        calculateStats(attendanceData);
-        // Calculate total pages (assuming backend returns pagination info)
-        if (response.count) {
-          setTotalPages(Math.ceil(response.count / 20));
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch attendance:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const calculateStats = (attendanceData) => {
-    if (!Array.isArray(attendanceData)) {
-      setStats({ present: 0, absent: 0, late: 0, total: 0 });
-      return;
-    }
+  // Calculate statistics
+  const stats = useMemo(() => {
+    const total = todayAttendance.length;
+    const present = todayAttendance.filter(att => att.status === 'present').length;
+    const absent = total - present; // Correct calculation: Total - Present = Absent
+    const late = todayAttendance.filter(att => att.status === 'late').length;
+    const onLeave = todayAttendance.filter(att => att.status === 'leave').length;
     
-    const present = attendanceData.filter(a => a.status === 'present').length;
-    const absent = attendanceData.filter(a => a.status === 'absent').length;
-    const late = attendanceData.filter(a => a.status === 'late').length;
-    const total = attendanceData.length;
-    
-    // For monthly view, calculate total days in the month
-    let totalDays = total;
-    if (viewMode === 'monthly') {
-      const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-      totalDays = daysInMonth;
-    }
-    
-    setStats({ present, absent, late, total: totalDays });
-  };
-
-  const getStatusBadge = (status) => {
-    const badges = {
-      present: 'bg-green-100 text-green-800',
-      absent: 'bg-red-100 text-red-800',
-      late: 'bg-yellow-100 text-yellow-800',
-      half_day: 'bg-orange-100 text-orange-800',
-      leave: 'bg-blue-100 text-blue-800'
+    return {
+      total,
+      present,
+      absent,
+      late,
+      onLeave,
+      attendanceRate: total > 0 ? Math.round((present / total) * 100) : 0
     };
-    return badges[status] || 'bg-gray-100 text-gray-800';
-  };
+  }, [todayAttendance]);
 
-  const changeMonth = (direction) => {
-    if (direction === 'next') {
-      if (currentMonth === 11) {
-        setCurrentMonth(0);
-        setCurrentYear(currentYear + 1);
-      } else {
-        setCurrentMonth(currentMonth + 1);
-      }
-    } else {
-      if (currentMonth === 0) {
-        setCurrentMonth(11);
-        setCurrentYear(currentYear - 1);
-      } else {
-        setCurrentMonth(currentMonth - 1);
-      }
+  // Filter attendance data
+  const filteredData = useMemo(() => {
+    let filtered = attendanceData;
+
+    // Apply search filter
+    if (searchTerm) {
+      filtered = filtered.filter(att => 
+        att.user?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        att.user?.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        att.user?.employee_id?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Apply status filter
+    if (statusFilter) {
+      filtered = filtered.filter(att => att.status === statusFilter);
+    }
+
+    return filtered;
+  }, [attendanceData, searchTerm, statusFilter]);
+
+  // Get status icon and color
+  const getStatusInfo = (status) => {
+    switch (status) {
+      case 'present':
+        return { icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-100' };
+      case 'absent':
+        return { icon: XCircle, color: 'text-red-600', bgColor: 'bg-red-100' };
+      case 'late':
+        return { icon: AlertCircle, color: 'text-yellow-600', bgColor: 'bg-yellow-100' };
+      case 'leave':
+        return { icon: Calendar, color: 'text-blue-600', bgColor: 'bg-blue-100' };
+      case 'half_day':
+        return { icon: Clock, color: 'text-orange-600', bgColor: 'bg-orange-100' };
+      default:
+        return { icon: User, color: 'text-gray-600', bgColor: 'bg-gray-100' };
     }
   };
 
-  const getMonthName = (monthIndex) => {
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    return months[monthIndex];
+  // Format time
+  const formatTime = (timeString) => {
+    if (!timeString) return '--';
+    return new Date(timeString).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
   };
 
-
-
-  const handleViewEmployee = (employee) => {
-    onViewEmployee(employee);
-  };
-
-  const exportAttendance = () => {
-    const csvContent = [
-      ['Employee', 'Date', 'Check In', 'Check Out', 'Status', 'Total Hours', 'Notes'],
-      ...(Array.isArray(attendance) ? attendance.map(record => [
-        `${record.user?.first_name} ${record.user?.last_name}`,
-        record.date,
-        formatTime(record.check_in_time),
-        formatTime(record.check_out_time),
-        record.status,
-        record.total_hours || 'N/A',
-        record.notes || ''
-      ]) : [])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-         const fileName = viewMode === 'monthly' 
-       ? `attendance_${getMonthName(currentMonth)}_${currentYear}.csv`
-       : `attendance_${viewMode}_${new Date().toISOString().split('T')[0]}.csv`;
-     a.download = fileName;
-    a.click();
-    window.URL.revokeObjectURL(url);
+  // Format date
+  const formatDate = (dateString) => {
+    if (!dateString) return '--';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
   return (
     <div className="space-y-6">
-      {/* View Mode Toggle */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <div className="flex bg-gray-100 rounded-lg p-1">
-            <button
-              onClick={() => setViewMode('today')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'today'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Today
-            </button>
-            <button
-              onClick={() => setViewMode('date')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'date'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              By Date
-            </button>
-            <button
-              onClick={() => setViewMode('employee')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'employee'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              By Employee
-            </button>
-            <button
-              onClick={() => setViewMode('monthly')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'monthly'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              By Month
-            </button>
-          </div>
-
-          {/* Real-time Status Indicator */}
-          <div className="flex items-center space-x-2 px-3 py-2 bg-gray-100 rounded-lg">
-            <div className={`flex items-center space-x-2 ${isRealtimeActive ? 'text-green-600' : 'text-red-600'}`}>
-              {isRealtimeActive ? (
-                <Wifi className="h-4 w-4 animate-pulse" />
-              ) : (
-                <WifiOff className="h-4 w-4" />
-              )}
-              <span className="text-sm font-medium">
-                {isRealtimeActive ? 'Live' : 'Offline'}
-              </span>
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Total Employees */}
+        <div className="bg-white rounded-lg shadow-sm border p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Employees</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
             </div>
-            {lastUpdate && (
-              <span className="text-xs text-gray-500">
-                Last: {lastUpdate.toLocaleTimeString()}
-              </span>
-            )}
-          </div>
-
-          {/* Fingerprint Notifications */}
-          {fingerprintNotifications.length > 0 && (
-            <div className="relative">
-              <Button variant="outline" className="relative">
-                <Bell className="h-4 w-4 mr-2" />
-                Fingerprints
-                <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                  {fingerprintNotifications.length}
-                </span>
-              </Button>
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Users className="h-6 w-6 text-blue-600" />
             </div>
-          )}
+          </div>
         </div>
-        
-        <Button onClick={exportAttendance} variant="outline">
-          <Download className="h-4 w-4 mr-2" />
-          Export
-        </Button>
+
+        {/* Present */}
+        <div className="bg-white rounded-lg shadow-sm border p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Present</p>
+              <p className="text-2xl font-bold text-green-600">{stats.present}</p>
+            </div>
+            <div className="p-2 bg-green-100 rounded-lg">
+              <CheckCircle className="h-6 w-6 text-green-600" />
+            </div>
+          </div>
+        </div>
+
+        {/* Absent */}
+        <div className="bg-white rounded-lg shadow-sm border p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Absent</p>
+              <p className="text-2xl font-bold text-red-600">{stats.absent}</p>
+            </div>
+            <div className="p-2 bg-red-100 rounded-lg">
+              <XCircle className="h-6 w-6 text-red-600" />
+            </div>
+          </div>
+        </div>
+
+        {/* Late */}
+        <div className="bg-white rounded-lg shadow-sm border p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Late</p>
+              <p className="text-2xl font-bold text-yellow-600">{stats.late}</p>
+            </div>
+            <div className="p-2 bg-yellow-100 rounded-lg">
+              <AlertCircle className="h-6 w-6 text-yellow-600" />
+            </div>
+          </div>
+        </div>
+
+        {/* Attendance Rate */}
+        <div className="bg-white rounded-lg shadow-sm border p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Attendance Rate</p>
+              <p className="text-2xl font-bold text-blue-600">{stats.attendanceRate}%</p>
+            </div>
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <TrendingUp className="h-6 w-6 text-blue-600" />
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center space-x-4">
-        {viewMode === 'date' && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Select Date</label>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        )}
-        
-        {viewMode === 'employee' && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Select Employee</label>
-            <select
-              value={selectedEmployee}
-              onChange={(e) => setSelectedEmployee(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Employees</option>
-              {Array.isArray(employees) && employees.map(employee => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.first_name} {employee.last_name}
-                </option>
-              ))}
-            </select>
-          </div>
-                 )}
-       </div>
-
-       {/* Month Navigation - Only show for monthly view */}
-       {viewMode === 'monthly' && (
-         <div className="flex items-center justify-between bg-white p-4 rounded-lg border">
-           <Button onClick={() => changeMonth('prev')} variant="outline" size="sm">
-             <ChevronLeft className="h-4 w-4 mr-2" />
-             Previous
-           </Button>
-           <h3 className="text-lg font-medium text-gray-900">
-             {getMonthName(currentMonth)} {currentYear}
-           </h3>
-           <Button onClick={() => changeMonth('next')} variant="outline" size="sm">
-             Next
-             <ChevronRight className="h-4 w-4 ml-2" />
-           </Button>
-         </div>
-       )}
-
-              {/* Statistics */}
-       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-         <Card className="p-4">
-           <div className="text-center">
-             <div className="text-2xl font-bold text-green-600">{stats.present}</div>
-             <div className="text-sm text-gray-600">Present</div>
-             {viewMode === 'monthly' && (
-               <div className="text-xs text-gray-500 mt-1">{getMonthName(currentMonth)} {currentYear}</div>
-             )}
-           </div>
-         </Card>
-         <Card className="p-4">
-           <div className="text-center">
-             <div className="text-2xl font-bold text-red-600">{stats.absent}</div>
-             <div className="text-sm text-gray-600">Absent</div>
-             {viewMode === 'monthly' && (
-               <div className="text-xs text-gray-500 mt-1">{getMonthName(currentMonth)} {currentYear}</div>
-             )}
-           </div>
-         </Card>
-         <Card className="p-4">
-           <div className="text-center">
-             <div className="text-2xl font-bold text-yellow-600">{stats.late}</div>
-             <div className="text-sm text-gray-600">Late</div>
-             {viewMode === 'monthly' && (
-               <div className="text-xs text-gray-500 mt-1">{getMonthName(currentMonth)} {currentYear}</div>
-             )}
-           </div>
-         </Card>
-         <Card className="p-4">
-           <div className="text-center">
-             <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
-             <div className="text-sm text-gray-600">
-               {viewMode === 'monthly' ? 'Total Days' : 'Total Records'}
-             </div>
-             {viewMode === 'monthly' && (
-               <div className="text-xs text-gray-500 mt-1">{getMonthName(currentMonth)} {currentYear}</div>
-             )}
-           </div>
-         </Card>
-       </div>
-
-      {/* ZKTeco Device Status */}
-      {zktecoDeviceStatus && (
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">ZKTeco Device Status</h3>
-            <div className="flex items-center space-x-2">
-              <div className={`h-3 w-3 rounded-full ${zktecoDeviceStatus.online_devices > 0 ? 'bg-green-500' : 'bg-red-500'}`}></div>
-              <span className="text-sm text-gray-600">
-                {zktecoDeviceStatus.online_devices}/{zktecoDeviceStatus.total_devices} Online
-              </span>
+      {/* Filters and Search */}
+      <div className="bg-white rounded-lg shadow-sm border p-4">
+        <div className="flex flex-col md:flex-row gap-4">
+          {/* Search */}
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search employees..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {Array.isArray(zktecoDeviceStatus.devices) && zktecoDeviceStatus.devices.map((device) => (
-              <div key={device.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                <div className={`h-3 w-3 rounded-full ${device.is_online ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">{device.name}</p>
-                  <p className="text-xs text-gray-500">{device.ip_address}:{device.port}</p>
-                  {device.office && (
-                    <p className="text-xs text-gray-400">{device.office}</p>
-                  )}
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-gray-500">
-                    {device.is_online ? 'Online' : 'Offline'}
-                  </p>
-                  {device.last_sync && (
-                    <p className="text-xs text-gray-400">
-                      Last: {new Date(device.last_sync).toLocaleTimeString()}
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
 
-             {/* Attendance Table */}
-       <Card className="p-6">
-         {viewMode === 'monthly' && (
-           <div className="mb-4 p-4 bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg">
-             <div className="grid grid-cols-3 gap-4 text-center">
-               <div>
-                 <div className="text-lg font-semibold text-gray-800">{getMonthName(currentMonth)} {currentYear}</div>
-                 <div className="text-sm text-gray-600">Current Month</div>
-               </div>
-               <div>
-                 <div className="text-lg font-semibold text-green-600">{stats.present} days</div>
-                 <div className="text-sm text-gray-600">Present</div>
-               </div>
-               <div>
-                 <div className="text-lg font-semibold text-red-600">{stats.absent} days</div>
-                 <div className="text-sm text-gray-600">Absent</div>
-               </div>
-             </div>
-           </div>
-         )}
-        {loading ? (
-          <div className="flex items-center justify-center h-32">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          {/* Status Filter */}
+          <div className="md:w-48">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Status</option>
+              <option value="present">Present</option>
+              <option value="absent">Absent</option>
+              <option value="late">Late</option>
+              <option value="half_day">Half Day</option>
+              <option value="leave">Leave</option>
+            </select>
           </div>
-        ) : (Array.isArray(attendance) && attendance.length > 0) ? (
-          <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check In</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check Out</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Hours</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {Array.isArray(attendance) && attendance.map((record) => (
-                    <tr key={record.id} className="hover:bg-gray-50">
+        </div>
+      </div>
+
+      {/* Attendance Table */}
+      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">Today's Attendance</h3>
+          <p className="text-sm text-gray-600">
+            {formatDate(new Date().toISOString())} • {filteredData.length} records
+          </p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Employee
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Check In
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Check Out
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Total Hours
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredData.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                    <Users className="mx-auto h-12 w-12 text-gray-400" />
+                    <p className="mt-2 text-sm">No attendance records found</p>
+                    <p className="text-xs">Try adjusting your filters or search terms</p>
+                  </td>
+                </tr>
+              ) : (
+                filteredData.map((attendance) => {
+                  const statusInfo = getStatusInfo(attendance.status);
+                  const StatusIcon = statusInfo.icon;
+
+                  return (
+                    <tr key={attendance.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                            <Users className="h-4 w-4 text-blue-600" />
+                          <div className="flex-shrink-0 h-10 w-10">
+                            <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
+                              <User className="h-6 w-6 text-gray-600" />
+                            </div>
                           </div>
-                          <div className="ml-3">
+                          <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900">
-                              {record.user?.first_name} {record.user?.last_name}
+                              {attendance.user?.first_name} {attendance.user?.last_name}
                             </div>
                             <div className="text-sm text-gray-500">
-                              {record.user?.employee_id || 'No ID'}
+                              {attendance.user?.employee_id}
                             </div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatDateWithDay(record.date)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {formatTime(record.check_in_time)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {formatTime(record.check_out_time)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {record.total_hours ? `${record.total_hours}h` : 'N/A'}
-                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(record.status)}`}>
-                          {record.status}
-                        </span>
+                        <div className="flex items-center">
+                          <div className={`p-2 rounded-full ${statusInfo.bgColor}`}>
+                            <StatusIcon className={`h-4 w-4 ${statusInfo.color}`} />
+                          </div>
+                          <span className={`ml-2 text-sm font-medium capitalize ${statusInfo.color}`}>
+                            {attendance.status?.replace('_', ' ')}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatTime(attendance.check_in_time)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatTime(attendance.check_out_time)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {attendance.total_hours ? `${attendance.total_hours}h` : '--'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <Button
-                          onClick={() => handleViewEmployee(record.user)}
-                          size="sm"
+                          onClick={() => onViewEmployee(attendance.user)}
                           variant="outline"
+                          size="sm"
+                          className="text-blue-600 hover:text-blue-900"
                         >
-                          <Eye className="h-3 w-3 mr-1" />
-                          View
+                          View Details
                         </Button>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between mt-6">
-                <div className="flex items-center space-x-2">
-                  <Button
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1}
-                    variant="outline"
-                    size="sm"
-                  >
-                    <ChevronLeft className="h-4 w-4 mr-1" />
-                    Previous
-                  </Button>
-                  <span className="text-sm text-gray-700">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <Button
-                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                    disabled={currentPage === totalPages}
-                    variant="outline"
-                    size="sm"
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
+      {/* Recent Activity */}
+      <div className="bg-white rounded-lg shadow-sm border p-6">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Activity</h3>
+        <div className="space-y-3">
+          {attendanceData.slice(0, 5).map((attendance) => {
+            const statusInfo = getStatusInfo(attendance.status);
+            const StatusIcon = statusInfo.icon;
+
+            return (
+              <div key={attendance.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                <div className={`p-2 rounded-full ${statusInfo.bgColor}`}>
+                  <StatusIcon className={`h-4 w-4 ${statusInfo.color}`} />
                 </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-900">
+                    {attendance.user?.first_name} {attendance.user?.last_name}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {formatDate(attendance.date)} • {formatTime(attendance.check_in_time)}
+                  </p>
+                </div>
+                <span className={`text-xs font-medium capitalize ${statusInfo.color}`}>
+                  {attendance.status?.replace('_', ' ')}
+                </span>
               </div>
-            )}
-          </>
-        ) : (
-                     <div className="text-center py-12">
-             <Clock className="mx-auto h-12 w-12 text-gray-400" />
-             <h3 className="mt-2 text-sm font-medium text-gray-900">
-               {viewMode === 'monthly' 
-                 ? `No attendance records found for ${getMonthName(currentMonth)} ${currentYear}`
-                 : 'No attendance records found'
-               }
-             </h3>
-             <p className="mt-1 text-sm text-gray-500">
-               {viewMode === 'monthly'
-                 ? `No attendance data available for ${getMonthName(currentMonth)} ${currentYear}`
-                 : 'No attendance data available for the selected criteria'
-               }
-             </p>
-           </div>
-        )}
-      </Card>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 };

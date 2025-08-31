@@ -31,6 +31,15 @@ const EmployeeAttendanceView = ({ employee, onBack }) => {
     }
   }, [employee, currentMonth, currentYear, viewMode]);
 
+  // Ensure stats are updated when month/year changes
+  useEffect(() => {
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    setStats(prevStats => ({
+      ...prevStats,
+      total: daysInMonth
+    }));
+  }, [currentMonth, currentYear]);
+
   const fetchEmployeeAttendance = async () => {
     try {
       setLoading(true);
@@ -41,18 +50,20 @@ const EmployeeAttendanceView = ({ employee, onBack }) => {
           user: employee.id
         });
         
-        // Handle monthly response structure
-        if (response.attendance_records) {
-          setAttendance(response.attendance_records);
-          setStats({
-            present: response.statistics.present_days,
-            absent: response.statistics.absent_days,
-            total: response.statistics.total_days_in_month
-          });
-        } else {
-          setAttendance(response.results || response);
-          calculateStats(response.results || response);
-        }
+                 // Handle monthly response structure
+         if (response.attendance_records) {
+           setAttendance(response.attendance_records);
+           // Ensure we have the correct total days calculation
+           const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+           setStats({
+             present: response.statistics?.present_days || 0,
+             absent: response.statistics?.absent_days || (daysInMonth - (response.statistics?.present_days || 0)),
+             total: response.statistics?.total_days_in_month || daysInMonth
+           });
+         } else {
+           setAttendance(response.results || response);
+           calculateStats(response.results || response);
+         }
       } else {
         // For previous months, get last 3 months
         const endDate = new Date(currentYear, currentMonth + 1, 0);
@@ -75,15 +86,24 @@ const EmployeeAttendanceView = ({ employee, onBack }) => {
   };
 
   const calculateStats = (attendanceData) => {
-    // Simple counts - only present and absent
+    // Calculate total days in month
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     const present = attendanceData.filter(a => a.status === 'present').length;
-    const absent = attendanceData.filter(a => a.status === 'absent').length;
-    const total = attendanceData.length;
+    const absent = daysInMonth - present; // Correct calculation: Total Days - Present Days = Absent Days
+    
+    console.log('calculateStats:', {
+      currentYear,
+      currentMonth,
+      daysInMonth,
+      present,
+      absent,
+      attendanceDataLength: attendanceData.length
+    });
     
     setStats({ 
       present, 
       absent, 
-      total
+      total: daysInMonth // Total days in month
     });
   };
 
@@ -121,6 +141,49 @@ const EmployeeAttendanceView = ({ employee, onBack }) => {
       return attendance;
     }
     return attendance.filter(record => record.status === statusFilter);
+  };
+
+  // Generate complete month view with all days (present and absent)
+  const generateCompleteMonthView = () => {
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const completeMonth = [];
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      const currentDate = new Date(currentYear, currentMonth, day);
+      const dateString = currentDate.toISOString().split('T')[0];
+      
+      // Find if there's an attendance record for this day
+      const attendanceRecord = attendance.find(record => {
+        const recordDate = new Date(record.date);
+        return recordDate.getDate() === day && 
+               recordDate.getMonth() === currentMonth && 
+               recordDate.getFullYear() === currentYear;
+      });
+      
+      if (attendanceRecord) {
+        // Present day - use actual attendance record
+        completeMonth.push({
+          ...attendanceRecord,
+          isPresent: true,
+          displayDate: currentDate
+        });
+      } else {
+        // Absent day - create a placeholder record
+        completeMonth.push({
+          id: `absent-${day}`,
+          date: dateString,
+          check_in_time: null,
+          check_out_time: null,
+          total_hours: 0,
+          status: 'absent',
+          notes: 'No attendance record',
+          isPresent: false,
+          displayDate: currentDate
+        });
+      }
+    }
+    
+    return completeMonth;
   };
 
 
@@ -221,26 +284,18 @@ const EmployeeAttendanceView = ({ employee, onBack }) => {
         </Button>
       </div>
 
-      {/* Month Overview */}
-      <Card className="p-4 bg-gradient-to-r from-gray-50 to-blue-50">
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div>
-            <div className="text-lg font-semibold text-gray-800">{getMonthName(currentMonth)} {currentYear}</div>
-            <div className="text-sm text-gray-600">Current Month</div>
-          </div>
-          <div>
-            <div className="text-lg font-semibold text-green-600">{stats.present} days</div>
-            <div className="text-sm text-gray-600">Present</div>
-          </div>
-          <div>
-            <div className="text-lg font-semibold text-red-600">{stats.absent} days</div>
-            <div className="text-sm text-gray-600">Absent</div>
-          </div>
-        </div>
-      </Card>
 
       {/* Simple Statistics */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
+        <Card className="p-6">
+          <div className="text-center">
+            <div className="text-3xl font-bold text-blue-600">
+              {stats.total || new Date(currentYear, currentMonth + 1, 0).getDate()}
+            </div>
+            <div className="text-lg text-gray-600">Total Days in Month</div>
+            <div className="text-sm text-gray-500 mt-1">{getMonthName(currentMonth)} {currentYear}</div>
+          </div>
+        </Card>
         <Card className="p-6">
           <div className="text-center">
             <div className="text-3xl font-bold text-green-600">{stats.present}</div>
@@ -274,9 +329,9 @@ const EmployeeAttendanceView = ({ employee, onBack }) => {
             <option value="absent">Absent Only</option>
           </select>
         </div>
-        <div className="text-sm text-gray-600">
-          Showing {getFilteredAttendance().length} of {attendance.length} records for {getMonthName(currentMonth)} {currentYear}
-        </div>
+                 <div className="text-sm text-gray-600">
+           Showing {generateCompleteMonthView().length} days for {getMonthName(currentMonth)} {currentYear}
+         </div>
       </div>
 
       {/* Attendance Table */}
@@ -285,7 +340,7 @@ const EmployeeAttendanceView = ({ employee, onBack }) => {
           <div className="flex items-center justify-center h-32">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           </div>
-        ) : getFilteredAttendance().length > 0 ? (
+                 ) : generateCompleteMonthView().length > 0 ? (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -298,31 +353,31 @@ const EmployeeAttendanceView = ({ employee, onBack }) => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {getFilteredAttendance().map((record) => (
-                  <tr key={record.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                             {formatDateWithDay(record.date)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {formatTime(record.check_in_time)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {formatTime(record.check_out_time)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {record.total_hours ? `${record.total_hours}h` : 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(record.status)}`}>
-                        {record.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {record.notes || '-'}
-                    </td>
-                  </tr>
-                ))}
+                             <tbody className="bg-white divide-y divide-gray-200">
+                                  {generateCompleteMonthView().map((record) => (
+                   <tr key={record.id} className={`hover:bg-gray-50 ${!record.isPresent ? 'bg-red-50' : ''}`}>
+                     <td className={`px-6 py-4 whitespace-nowrap text-sm ${!record.isPresent ? 'text-red-900 font-medium' : 'text-gray-900'}`}>
+                       {formatDateWithDay(record.date)}
+                     </td>
+                     <td className={`px-6 py-4 whitespace-nowrap text-sm ${!record.isPresent ? 'text-red-600' : 'text-gray-600'}`}>
+                       {record.isPresent ? formatTime(record.check_in_time) : 'Not Checked In'}
+                     </td>
+                     <td className={`px-6 py-4 whitespace-nowrap text-sm ${!record.isPresent ? 'text-red-600' : 'text-gray-600'}`}>
+                       {record.isPresent ? formatTime(record.check_out_time) : 'Not Checked Out'}
+                     </td>
+                     <td className={`px-6 py-4 whitespace-nowrap text-sm ${!record.isPresent ? 'text-red-600' : 'text-gray-600'}`}>
+                       {record.isPresent ? (record.total_hours ? `${record.total_hours}h` : 'N/A') : '0h'}
+                     </td>
+                     <td className="px-6 py-4 whitespace-nowrap">
+                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(record.status)}`}>
+                         {record.status}
+                       </span>
+                     </td>
+                     <td className={`px-6 py-4 text-sm ${!record.isPresent ? 'text-red-600' : 'text-gray-600'}`}>
+                       {record.notes || '-'}
+                     </td>
+                   </tr>
+                 ))}
               </tbody>
             </table>
           </div>
@@ -330,16 +385,10 @@ const EmployeeAttendanceView = ({ employee, onBack }) => {
           <div className="text-center py-12">
             <Calendar className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">
-              {statusFilter === 'all' 
-                ? 'No attendance records found' 
-                : `No ${statusFilter} records found`
-              }
+              No days to display
             </h3>
             <p className="mt-1 text-sm text-gray-500">
-              {statusFilter === 'all' 
-                ? `No attendance data available for ${getMonthName(currentMonth)} ${currentYear}`
-                : `No ${statusFilter} records for ${getMonthName(currentMonth)} ${currentYear}`
-              }
+              Unable to generate month view for {getMonthName(currentMonth)} {currentYear}
             </p>
           </div>
         )}

@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://company.d0s369.co.in/api';
-// const API_BASE_URL = 'https://company.d0s369.co.in/api';
+// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://company.d0s369.co.in/api';
+const API_BASE_URL = 'http://127.0.0.1:8000/api';
 
 class ApiService {
   constructor() {
@@ -209,6 +209,28 @@ class ApiService {
     return response.data;
   }
 
+  async getManagerAttendance(params = {}) {
+    // Get attendance data for manager's office
+    const response = await this.api.get('/attendance/', { 
+      params: { 
+        ...params,
+        limit: params.limit || 10
+      } 
+    });
+    return response.data;
+  }
+
+  async getManagerLeaves(params = {}) {
+    // Get leaves data for manager's office
+    const response = await this.api.get('/leaves/', { 
+      params: { 
+        ...params,
+        limit: params.limit || 10
+      } 
+    });
+    return response.data;
+  }
+
   async getEmployee(id) {
     const response = await this.api.get(`/users/${id}/`);
     return response.data;
@@ -237,6 +259,38 @@ class ApiService {
 
   async getTodayAttendance(params = {}) {
     const response = await this.api.get('/attendance/today/', { params });
+    return response.data;
+  }
+
+  async getRealtimeAttendance(params = {}) {
+    const response = await this.api.get('/attendance/realtime/', { params });
+    return response.data;
+  }
+
+  async getCheckinCheckoutData(params = {}) {
+    const response = await this.api.get('/attendance/checkin_checkout/', { params });
+    return response.data;
+  }
+
+  async getMonthlyAttendance(month, year, params = {}) {
+    const response = await this.api.get('/attendance/monthly/', { 
+      params: { 
+        month, 
+        year, 
+        ...params 
+      } 
+    });
+    return response.data;
+  }
+
+  async getAttendanceReport(startDate, endDate, params = {}) {
+    const response = await this.api.get('/attendance/report/', { 
+      params: { 
+        start_date: startDate,
+        end_date: endDate,
+        ...params 
+      } 
+    });
     return response.data;
   }
 
@@ -368,6 +422,12 @@ class ApiService {
     return response.data;
   }
 
+  async getManagerDevices(params = {}) {
+    // Get devices for the manager's office (backend automatically filters by office)
+    const response = await this.api.get('/devices/', { params });
+    return response.data;
+  }
+
   async getDevice(id) {
     const response = await this.api.get(`/devices/${id}/`);
     return response.data;
@@ -470,6 +530,52 @@ class ApiService {
     const response = await this.api.get(`/reports/${reportType}/export/`, { 
       params,
       responseType: 'blob'
+    });
+    return response.data;
+  }
+
+  // Document endpoints
+  async getDocuments(params = {}) {
+    const response = await this.api.get('/documents/', { params });
+    return response.data;
+  }
+
+  async getDocument(id) {
+    const response = await this.api.get(`/documents/${id}/`);
+    return response.data;
+  }
+
+  async createDocument(documentData) {
+    const response = await this.api.post('/documents/', documentData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  }
+
+  async updateDocument(id, documentData) {
+    const response = await this.api.put(`/documents/${id}/`, documentData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  }
+
+  async deleteDocument(id) {
+    const response = await this.api.delete(`/documents/${id}/`);
+    return response.data;
+  }
+
+  async getMyDocuments(params = {}) {
+    const response = await this.api.get('/documents/my/', { params });
+    return response.data;
+  }
+
+  async downloadDocument(id) {
+    const response = await this.api.get(`/documents/${id}/download/`, {
+      responseType: 'blob',
     });
     return response.data;
   }

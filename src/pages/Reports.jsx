@@ -9,9 +9,15 @@ import {
   TrendingUp,
   TrendingDown,
   FileText,
-  Activity,
   Target,
-  Award,
+  Search,
+  FileSpreadsheet,
+  FileText as FileTextIcon,
+  Filter,
+  User,
+  CalendarDays,
+  CheckCircle,
+  XCircle,
   AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -19,190 +25,493 @@ import api from '../services/api';
 
 const Reports = () => {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [reportType, setReportType] = useState('attendance');
-  const [dateRange, setDateRange] = useState({
-    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0]
-  });
+  const [loading, setLoading] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [reportData, setReportData] = useState(null);
+  const [employees, setEmployees] = useState([]);
+  const [selectedEmployee, setSelectedEmployee] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredEmployees, setFilteredEmployees] = useState([]);
+
+  // Get month names
+  const getMonthName = (monthIndex) => {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months[monthIndex];
+  };
 
   useEffect(() => {
-    generateReport();
-  }, [reportType, dateRange]);
+    fetchEmployees();
+  }, []);
+
+  useEffect(() => {
+    if (employees.length > 0) {
+      generateReport();
+    }
+  }, [selectedMonth, selectedYear, selectedEmployee, employees, searchTerm]);
+
+  useEffect(() => {
+    // Filter employees based on search term
+    const filtered = employees.filter(emp => 
+      emp.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.employee_id?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setFilteredEmployees(filtered);
+    
+    // Reset selected employee if search term changes and selected employee is not in filtered results
+    if (searchTerm && selectedEmployee) {
+      const selectedEmp = employees.find(emp => emp.id === selectedEmployee);
+      const isInFiltered = filtered.some(emp => emp.id === selectedEmployee);
+      if (!isInFiltered) {
+        setSelectedEmployee('');
+      }
+    }
+  }, [searchTerm, employees, selectedEmployee]);
+
+  const fetchEmployees = async () => {
+    try {
+      const response = await api.getManagerEmployees();
+      const employeeList = response.results || response;
+      setEmployees(employeeList);
+      setFilteredEmployees(employeeList);
+    } catch (error) {
+      console.error('Failed to fetch employees:', error);
+    }
+  };
+
+  const handleEmployeeSelect = (employeeId) => {
+    setSelectedEmployee(employeeId);
+    // Clear search term when an employee is selected
+    if (employeeId) {
+      setSearchTerm('');
+    }
+  };
+
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setSelectedEmployee('');
+  };
 
   const generateReport = async () => {
     try {
       setLoading(true);
-      let data = null;
+      
+      const params = {
+        month: selectedMonth + 1, // API expects 1-12
+        year: selectedYear
+      };
 
-      switch (reportType) {
-        case 'attendance':
-          data = await generateAttendanceReport();
-          break;
-        case 'leave':
-          data = await generateLeaveReport();
-          break;
-        case 'employee':
-          data = await generateEmployeeReport();
-          break;
-        default:
-          data = await generateAttendanceReport();
+      // Get the employees to process based on current filters
+      const employeesToProcess = searchTerm 
+        ? filteredEmployees 
+        : (selectedEmployee ? employees.filter(emp => emp.id === selectedEmployee) : employees);
+
+      if (selectedEmployee) {
+        params.user_id = selectedEmployee;
       }
 
-      setReportData(data);
+      let response;
+      try {
+        // Try the monthly attendance endpoint first
+        response = await api.getMonthlyAttendance(selectedMonth + 1, selectedYear, params);
+      } catch (monthlyError) {
+        console.warn('Monthly attendance endpoint failed, falling back to regular attendance:', monthlyError);
+        
+        // Fallback to regular attendance endpoint with date range
+        const startDate = new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0];
+        const endDate = new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0];
+        
+        response = await api.getAttendance({
+          start_date: startDate,
+          end_date: endDate,
+          ...params
+        });
+      }
+      
+      // Debug: Log the response structure
+      console.log('API Response:', response);
+      console.log('Response type:', typeof response);
+      console.log('Response keys:', Object.keys(response || {}));
+      
+      // Handle the correct response structure from backend
+      let attendanceData;
+      let responseStats = {};
+      
+      if (response.attendance_records) {
+        // Monthly endpoint response structure
+        attendanceData = response.attendance_records;
+        responseStats = response.statistics || {};
+      } else if (response.results) {
+        // Regular attendance endpoint response structure
+        attendanceData = response.results;
+      } else if (Array.isArray(response)) {
+        // Direct array response
+        attendanceData = response;
+      } else {
+        // Fallback: treat response as attendance data
+        attendanceData = response;
+      }
+      
+      console.log('Attendance data:', attendanceData);
+      console.log('Attendance data type:', typeof attendanceData);
+      console.log('Is array:', Array.isArray(attendanceData));
+
+      // Calculate statistics
+      const totalDays = response.total_days_in_month || new Date(selectedYear, selectedMonth + 1, 0).getDate();
+      const totalEmployees = employeesToProcess.length;
+      
+      let totalPresentDays = 0;
+      let totalAbsentDays = 0;
+      let totalLateDays = 0;
+      let totalHalfDays = 0;
+
+      // Process attendance data
+      const processedData = employeesToProcess.map(employee => {
+        const employeeAttendance = Array.isArray(attendanceData) ? attendanceData.filter(att => att.user?.id === employee.id) : [];
+        const presentDays = employeeAttendance.filter(att => att.status === 'present').length;
+        const lateDays = employeeAttendance.filter(att => att.status === 'late').length;
+        const halfDays = employeeAttendance.filter(att => att.status === 'partial').length;
+        const absentDays = totalDays - presentDays;
+        const attendanceRate = totalDays > 0 ? (presentDays / totalDays * 100).toFixed(2) : 0;
+
+        // Update totals
+        totalPresentDays += presentDays;
+        totalAbsentDays += absentDays;
+        totalLateDays += lateDays;
+        totalHalfDays += halfDays;
+
+        return {
+          ...employee,
+          attendance: employeeAttendance,
+          presentDays,
+          absentDays,
+          lateDays,
+          halfDays,
+          attendanceRate: parseFloat(attendanceRate),
+          totalDays
+        };
+      });
+
+      setReportData({
+        month: selectedMonth,
+        year: selectedYear,
+        totalDays,
+        totalEmployees,
+        summary: {
+          totalPresentDays,
+          totalAbsentDays,
+          totalLateDays,
+          totalHalfDays,
+          averageAttendanceRate: totalEmployees > 0 ? (totalPresentDays / (totalDays * totalEmployees) * 100).toFixed(2) : 0
+        },
+        employees: processedData
+      });
+
     } catch (error) {
       console.error('Failed to generate report:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        response: error.response?.data
+      });
+      
+      // Get the employees to process based on current filters for error handling
+      const employeesToProcess = searchTerm 
+        ? filteredEmployees 
+        : (selectedEmployee ? employees.filter(emp => emp.id === selectedEmployee) : employees);
+
+      // Set empty report data to prevent further errors
+      setReportData({
+        month: selectedMonth,
+        year: selectedYear,
+        totalDays: new Date(selectedYear, selectedMonth + 1, 0).getDate(),
+        totalEmployees: employeesToProcess.length,
+        summary: {
+          totalPresentDays: 0,
+          totalAbsentDays: 0,
+          totalLateDays: 0,
+          totalHalfDays: 0,
+          averageAttendanceRate: 0
+        },
+        employees: employeesToProcess.map(emp => ({
+          ...emp,
+          attendance: [],
+          presentDays: 0,
+          absentDays: new Date(selectedYear, selectedMonth + 1, 0).getDate(),
+          lateDays: 0,
+          halfDays: 0,
+          attendanceRate: 0,
+          totalDays: new Date(selectedYear, selectedMonth + 1, 0).getDate()
+        }))
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const generateAttendanceReport = async () => {
-    const params = {
-      start_date: dateRange.startDate,
-      end_date: dateRange.endDate
-    };
-
-    const response = await api.getAttendance(params);
-    const attendanceData = (response.results || response).filter(
-      record => record.user?.office?.id === user?.office?.id
-    );
-
-    const totalRecords = attendanceData.length;
-    const presentCount = attendanceData.filter(a => a.status === 'present').length;
-    const absentCount = attendanceData.filter(a => a.status === 'absent').length;
-    const lateCount = attendanceData.filter(a => a.status === 'late').length;
-    const attendanceRate = totalRecords > 0 ? (presentCount / totalRecords * 100).toFixed(2) : 0;
-
-    return {
-      type: 'attendance',
-      summary: {
-        totalRecords,
-        presentCount,
-        absentCount,
-        lateCount,
-        attendanceRate: parseFloat(attendanceRate)
-      },
-      rawData: attendanceData
-    };
-  };
-
-  const generateLeaveReport = async () => {
-    const params = {
-      start_date: dateRange.startDate,
-      end_date: dateRange.endDate
-    };
-
-    const response = await api.getLeaves(params);
-    const leaveData = (response.results || response).filter(
-      leave => leave.user?.office?.id === user?.office?.id
-    );
-
-    const totalLeaves = leaveData.length;
-    const approvedLeaves = leaveData.filter(l => l.status === 'approved').length;
-    const pendingLeaves = leaveData.filter(l => l.status === 'pending').length;
-    const rejectedLeaves = leaveData.filter(l => l.status === 'rejected').length;
-    const approvalRate = totalLeaves > 0 ? (approvedLeaves / totalLeaves * 100).toFixed(2) : 0;
-
-    return {
-      type: 'leave',
-      summary: {
-        totalLeaves,
-        approvedLeaves,
-        pendingLeaves,
-        rejectedLeaves,
-        approvalRate: parseFloat(approvalRate)
-      },
-      rawData: leaveData
-    };
-  };
-
-  const generateEmployeeReport = async () => {
-    const response = await api.getEmployees();
-    const employees = (response.results || response).filter(
-      emp => emp.role === 'employee' && emp.office?.id === user?.office?.id
-    );
-
-    const totalEmployees = employees.length;
-    const activeEmployees = employees.filter(emp => emp.is_active).length;
-    const inactiveEmployees = employees.filter(emp => !emp.is_active).length;
-    const activationRate = totalEmployees > 0 ? (activeEmployees / totalEmployees * 100).toFixed(2) : 0;
-
-    return {
-      type: 'employee',
-      summary: {
-        totalEmployees,
-        activeEmployees,
-        inactiveEmployees,
-        activationRate: parseFloat(activationRate)
-      },
-      rawData: employees
-    };
-  };
-
-  const exportReport = () => {
+  const exportToExcel = () => {
     if (!reportData) return;
 
-    const dataStr = JSON.stringify(reportData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
+    // Create CSV content
+    const headers = [
+      'Employee ID',
+      'Name',
+      'Email',
+      'Total Days',
+      'Present Days',
+      'Absent Days',
+      'Late Days',
+      'Half Days',
+      'Attendance Rate (%)'
+    ];
+
+    const csvContent = [
+      headers.join(','),
+      ...reportData.employees.map(emp => [
+        emp.employee_id || 'N/A',
+        `${emp.first_name || ''} ${emp.last_name || ''}`.trim(),
+        emp.email || 'N/A',
+        emp.totalDays,
+        emp.presentDays,
+        emp.absentDays,
+        emp.lateDays,
+        emp.halfDays,
+        emp.attendanceRate
+      ].join(','))
+    ].join('\n');
+
+    // Create and download file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
-    link.href = url;
-    link.download = `${reportType}_report_${dateRange.startDate}_to_${dateRange.endDate}.json`;
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `attendance_report_${getMonthName(selectedMonth)}_${selectedYear}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
+    document.body.removeChild(link);
+  };
+
+  const exportToPDF = () => {
+    if (!reportData) return;
+
+    // Create a simple HTML table for PDF
+    const tableContent = `
+      <html>
+        <head>
+          <title>Attendance Report - ${getMonthName(selectedMonth)} ${selectedYear}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            .header { text-align: center; margin-bottom: 20px; }
+            .summary { margin-bottom: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Attendance Report</h1>
+            <h2>${getMonthName(selectedMonth)} ${selectedYear}</h2>
+            <p>Office: ${user?.office?.name || 'N/A'}</p>
+          </div>
+          
+          <div class="summary">
+            <h3>Summary</h3>
+            <p>Total Employees: ${reportData.totalEmployees}</p>
+            <p>Total Days: ${reportData.totalDays}</p>
+            <p>Average Attendance Rate: ${reportData.summary.averageAttendanceRate}%</p>
+          </div>
+          
+          <table>
+            <thead>
+              <tr>
+                <th>Employee ID</th>
+                <th>Name</th>
+                <th>Present Days</th>
+                <th>Absent Days</th>
+                <th>Late Days</th>
+                <th>Half Days</th>
+                <th>Attendance Rate (%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${reportData.employees.map(emp => `
+                <tr>
+                  <td>${emp.employee_id || 'N/A'}</td>
+                  <td>${emp.first_name || ''} ${emp.last_name || ''}</td>
+                  <td>${emp.presentDays}</td>
+                  <td>${emp.absentDays}</td>
+                  <td>${emp.lateDays}</td>
+                  <td>${emp.halfDays}</td>
+                  <td>${emp.attendanceRate}%</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    // Create and download PDF (using browser's print functionality)
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(tableContent);
+    printWindow.document.close();
+    printWindow.print();
   };
 
   const renderSummaryCards = () => {
     if (!reportData?.summary) return null;
 
     const { summary } = reportData;
-    const cards = [];
-
-    switch (reportData.type) {
-      case 'attendance':
-        cards.push(
-          { title: 'Total Records', value: summary.totalRecords, icon: <FileText className="h-4 w-4" />, color: 'bg-blue-500' },
-          { title: 'Present', value: summary.presentCount, icon: <TrendingUp className="h-4 w-4" />, color: 'bg-green-500' },
-          { title: 'Absent', value: summary.absentCount, icon: <TrendingDown className="h-4 w-4" />, color: 'bg-red-500' },
-          { title: 'Attendance Rate', value: `${summary.attendanceRate}%`, icon: <Target className="h-4 w-4" />, color: 'bg-purple-500' }
-        );
-        break;
-      case 'leave':
-        cards.push(
-          { title: 'Total Leaves', value: summary.totalLeaves, icon: <FileText className="h-4 w-4" />, color: 'bg-blue-500' },
-          { title: 'Approved', value: summary.approvedLeaves, icon: <Award className="h-4 w-4" />, color: 'bg-green-500' },
-          { title: 'Pending', value: summary.pendingLeaves, icon: <AlertCircle className="h-4 w-4" />, color: 'bg-yellow-500' },
-          { title: 'Approval Rate', value: `${summary.approvalRate}%`, icon: <Target className="h-4 w-4" />, color: 'bg-purple-500' }
-        );
-        break;
-      case 'employee':
-        cards.push(
-          { title: 'Total Employees', value: summary.totalEmployees, icon: <Users className="h-4 w-4" />, color: 'bg-blue-500' },
-          { title: 'Active', value: summary.activeEmployees, icon: <TrendingUp className="h-4 w-4" />, color: 'bg-green-500' },
-          { title: 'Inactive', value: summary.inactiveEmployees, icon: <TrendingDown className="h-4 w-4" />, color: 'bg-red-500' },
-          { title: 'Activation Rate', value: `${summary.activationRate}%`, icon: <Target className="h-4 w-4" />, color: 'bg-purple-500' }
-        );
-        break;
-    }
+    const cards = [
+      { 
+        title: 'Total Employees', 
+        value: reportData.totalEmployees, 
+        icon: <Users className="h-4 w-4" />, 
+        color: 'bg-blue-500' 
+      },
+      { 
+        title: 'Total Days', 
+        value: reportData.totalDays, 
+        icon: <CalendarDays className="h-4 w-4" />, 
+        color: 'bg-indigo-500' 
+      },
+      { 
+        title: 'Present Days', 
+        value: summary.totalPresentDays, 
+        icon: <CheckCircle className="h-4 w-4" />, 
+        color: 'bg-green-500' 
+      },
+      { 
+        title: 'Absent Days', 
+        value: summary.totalAbsentDays, 
+        icon: <XCircle className="h-4 w-4" />, 
+        color: 'bg-red-500' 
+      },
+      { 
+        title: 'Late Days', 
+        value: summary.totalLateDays, 
+        icon: <AlertCircle className="h-4 w-4" />, 
+        color: 'bg-yellow-500' 
+      },
+      { 
+        title: 'Attendance Rate', 
+        value: `${summary.averageAttendanceRate}%`, 
+        icon: <Target className="h-4 w-4" />, 
+        color: 'bg-purple-500' 
+      }
+    ];
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
         {cards.map((card, index) => (
-          <Card key={index} className="p-6">
+          <Card key={index} className="p-4">
             <div className="flex items-center">
-              <div className={`p-3 rounded-lg ${card.color} text-white`}>
+              <div className={`p-2 rounded-lg ${card.color} text-white`}>
                 {card.icon}
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">{card.title}</p>
-                <p className="text-2xl font-bold text-gray-900">{card.value}</p>
+              <div className="ml-3">
+                <p className="text-xs font-medium text-gray-600">{card.title}</p>
+                <p className="text-lg font-bold text-gray-900">{card.value}</p>
               </div>
             </div>
           </Card>
         ))}
       </div>
+    );
+  };
+
+  const renderEmployeeTable = () => {
+    if (!reportData?.employees) return null;
+
+    return (
+      <Card className="p-6">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Employee
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Present Days
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Absent Days
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Late Days
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Half Days
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Attendance Rate
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {reportData.employees.map((employee) => (
+                <tr key={employee.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 h-10 w-10">
+                        <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
+                          <User className="h-5 w-5 text-gray-600" />
+                        </div>
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">
+                          {employee.first_name} {employee.last_name}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {employee.employee_id || 'N/A'}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm text-green-600 font-medium">
+                      {employee.presentDays}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm text-red-600 font-medium">
+                      {employee.absentDays}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm text-yellow-600 font-medium">
+                      {employee.lateDays}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm text-orange-600 font-medium">
+                      {employee.halfDays}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <span className={`text-sm font-medium ${
+                        employee.attendanceRate >= 90 ? 'text-green-600' :
+                        employee.attendanceRate >= 75 ? 'text-yellow-600' : 'text-red-600'
+                      }`}>
+                        {employee.attendanceRate}%
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     );
   };
 
@@ -219,85 +528,119 @@ const Reports = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Office Reports</h1>
-          <p className="text-gray-600">Generate reports for your office</p>
+          <h1 className="text-2xl font-bold text-gray-900">Attendance Reports</h1>
+          <p className="text-gray-600">Monthly attendance reports for your office</p>
         </div>
         <div className="flex items-center space-x-3">
           <Button 
-            onClick={exportReport} 
+            onClick={exportToExcel} 
             disabled={!reportData}
-            className="flex items-center"
+            className="flex items-center bg-green-600 hover:bg-green-700"
           >
-            <Download className="h-4 w-4 mr-2" />
-            Export Report
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            Export Excel
+          </Button>
+          <Button 
+            onClick={exportToPDF} 
+            disabled={!reportData}
+            className="flex items-center bg-red-600 hover:bg-red-700"
+          >
+            <FileTextIcon className="h-4 w-4 mr-2" />
+            Export PDF
           </Button>
         </div>
       </div>
 
-      {/* Report Type Selection */}
-      <Card className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            { type: 'attendance', label: 'Attendance Report', icon: <Clock className="h-5 w-5" /> },
-            { type: 'leave', label: 'Leave Report', icon: <Calendar className="h-5 w-5" /> },
-            { type: 'employee', label: 'Employee Report', icon: <Users className="h-5 w-5" /> }
-          ].map((option) => (
-            <button
-              key={option.type}
-              onClick={() => setReportType(option.type)}
-              className={`p-4 rounded-lg border-2 transition-all ${
-                reportType === option.type
-                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                  : 'border-gray-200 hover:border-gray-300 text-gray-600'
-              }`}
-            >
-              <div className="flex items-center space-x-3">
-                {option.icon}
-                <span className="font-medium">{option.label}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      </Card>
-
-      {/* Date Range */}
+      {/* Month/Year Selection */}
       <Card className="p-6">
         <div className="flex items-center space-x-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-            <input
-              type="date"
-              value={dateRange.startDate}
-              onChange={(e) => setDateRange({...dateRange, startDate: e.target.value})}
+            <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
               className="px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            />
+            >
+              {Array.from({ length: 12 }, (_, i) => (
+                <option key={i} value={i}>{getMonthName(i)}</option>
+              ))}
+            </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-            <input
-              type="date"
-              value={dateRange.endDate}
-              onChange={(e) => setDateRange({...dateRange, endDate: e.target.value})}
+            <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
               className="px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            />
+            >
+              {Array.from({ length: 5 }, (_, i) => {
+                const year = new Date().getFullYear() - 2 + i;
+                return (
+                  <option key={year} value={year}>{year}</option>
+                );
+              })}
+            </select>
           </div>
         </div>
+      </Card>
+
+      {/* Employee Search and Filter */}
+      <Card className="p-6">
+                  <div className="flex items-center space-x-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Search Employee</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by name, email, or employee ID..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Employee</label>
+              <select
+                value={selectedEmployee}
+                onChange={(e) => handleEmployeeSelect(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">All Employees</option>
+                {filteredEmployees.map(emp => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.first_name} {emp.last_name} ({emp.employee_id || 'N/A'})
+                  </option>
+                ))}
+              </select>
+            </div>
+            {(searchTerm || selectedEmployee) && (
+              <div className="flex items-end">
+                <button
+                  onClick={clearAllFilters}
+                  className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  Clear Filters
+                </button>
+              </div>
+            )}
+          </div>
       </Card>
 
       {/* Report Content */}
       {reportData && (
         <div className="space-y-6">
           {renderSummaryCards()}
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              {reportType === 'attendance' && 'Attendance Overview'}
-              {reportType === 'leave' && 'Leave Overview'}
-              {reportType === 'employee' && 'Employee Overview'}
-            </h3>
-            <p className="text-gray-600">
-              Report generated for {user?.office?.name} from {dateRange.startDate} to {dateRange.endDate}
-            </p>
-          </Card>
+          {renderEmployeeTable()}
         </div>
       )}
 
@@ -307,7 +650,7 @@ const Reports = () => {
           <BarChart3 className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">No report generated</h3>
           <p className="mt-1 text-sm text-gray-500">
-            Select a report type to view analytics.
+            Select a month and year to view attendance analytics.
           </p>
         </div>
       )}
