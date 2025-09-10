@@ -4,25 +4,26 @@ import { Card } from '../../Components';
 const StatsCard = ({ title, value, subtitle, icon: Icon, color = 'blue' }) => {
   const getColorClasses = (color) => {
     const colors = {
-      blue: 'bg-gradient-to-r from-blue-500 to-indigo-500',
-      green: 'bg-gradient-to-r from-green-500 to-emerald-500',
-      yellow: 'bg-gradient-to-r from-yellow-500 to-orange-500',
-      purple: 'bg-gradient-to-r from-purple-500 to-pink-500',
-      red: 'bg-gradient-to-r from-red-500 to-pink-500'
+      blue: 'bg-blue-500',
+      green: 'bg-green-500',
+      yellow: 'bg-yellow-500',
+      purple: 'bg-purple-500',
+      red: 'bg-red-500',
+      indigo: 'bg-indigo-500'
     };
     return colors[color] || colors.blue;
   };
 
   return (
-    <Card className="hover:shadow-xl transition-all duration-300 border-2 border-gray-100 hover:border-blue-200 group">
+    <Card className="hover:shadow-md transition-all duration-200">
       <div className="card-body">
         <div className="flex items-center">
-          <div className={`p-4 rounded-2xl ${getColorClasses(color)} text-white shadow-lg group-hover:shadow-xl transition-all duration-300`}>
-            <Icon className="h-8 w-8" />
+          <div className={`p-2 rounded-lg ${getColorClasses(color)} text-white`}>
+            <Icon className="h-5 w-5" />
           </div>
-          <div className="ml-4">
-            <p className="text-sm font-medium text-gray-600">{title}</p>
-            <p className="text-3xl font-bold text-gray-900">{value}</p>
+          <div className="ml-3">
+            <p className="text-xs font-medium text-gray-600">{title}</p>
+            <p className="text-xl font-bold text-gray-900">{value}</p>
             {subtitle && (
               <p className="text-xs text-gray-500">{subtitle}</p>
             )}

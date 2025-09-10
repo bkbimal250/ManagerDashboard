@@ -1,0 +1,77 @@
+/* Clean Responsive Sidebar Styles */
+
+/* Mobile responsive improvements */
+@media (max-width: 1024px) {
+  .sidebar-container {
+    backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.95);
+  }
+}
+
+/* Scrollbar styling */
+.sidebar-nav::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 2px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 2px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Smooth transitions */
+* {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Focus states for accessibility */
+button:focus,
+a:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Mobile touch targets */
+@media (max-width: 768px) {
+  .nav-item {
+    min-height: 44px;
+  }
+  
+  button {
+    min-height: 44px;
+  }
+}
+
+/* Tablet responsive */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .sidebar-container {
+    width: 240px;
+  }
+}
+
+/* Desktop responsive */
+@media (min-width: 1025px) {
+  .sidebar-container {
+    width: 256px;
+  }
+}
+
+/* Ensure sidebar takes full height on all devices */
+.sidebar-container {
+  height: 100vh;
+  height: 100dvh; /* Dynamic viewport height for mobile */
+}
+
+/* Prevent content overflow */
+.sidebar-nav {
+  max-height: calc(100vh - 200px);
+  max-height: calc(100dvh - 200px);
+}

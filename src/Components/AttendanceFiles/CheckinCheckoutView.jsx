@@ -7,7 +7,10 @@ import {
   XCircle, 
   AlertCircle,
   Download,
-  RefreshCw
+  RefreshCw,
+  AlertTriangle,
+  Timer,
+  CalendarDays
 } from 'lucide-react';
 import { Button } from '../index';
 import api from '../../services/api';
@@ -32,7 +35,18 @@ const CheckinCheckoutView = ({ officeId }) => {
       setData(response);
     } catch (err) {
       console.error('Error fetching check-in/check-out data:', err);
-      setError(err.response?.data?.detail || 'Failed to fetch data');
+      
+      // Better error handling
+      let errorMessage = 'Failed to fetch data';
+      if (err.response?.status === 500) {
+        errorMessage = 'Server error - please try again or contact administrator';
+      } else if (err.response?.data?.detail) {
+        errorMessage = err.response.data.detail;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -53,8 +67,8 @@ const CheckinCheckoutView = ({ officeId }) => {
     if (!data) return;
     
     const csvContent = [
-      // Header
-      ['Employee ID', 'Employee Name', 'Check In Time', 'Check Out Time', 'Working Hours', 'Status', 'Device'],
+      // Enhanced header with new fields
+      ['Employee ID', 'Employee Name', 'Check In Time', 'Check Out Time', 'Working Hours', 'Status', 'Day Status', 'Late Coming', 'Late Minutes', 'Device'],
       // Data rows
       ...data.attendance_details.map(att => [
         att.employee_id_number || '',
@@ -63,6 +77,9 @@ const CheckinCheckoutView = ({ officeId }) => {
         att.check_out_time ? new Date(att.check_out_time).toLocaleTimeString() : 'Not Checked Out',
         att.working_hours ? `${att.working_hours}h` : 'N/A',
         att.status,
+        att.day_status ? att.day_status.replace('_', ' ').toUpperCase() : 'N/A',
+        att.is_late ? 'Yes' : 'No',
+        att.late_minutes > 0 ? `${att.late_minutes} min` : 'N/A',
         att.device_name || 'N/A'
       ])
     ].map(row => row.join(',')).join('\n');
@@ -76,35 +93,49 @@ const CheckinCheckoutView = ({ officeId }) => {
     window.URL.revokeObjectURL(url);
   };
 
-  // Get status icon and color
-  const getStatusInfo = (attendance) => {
-    if (!attendance.has_checkin && !attendance.has_checkout) {
-      return { icon: XCircle, color: 'text-red-600', bgColor: 'bg-red-100', text: 'Absent' };
-    } else if (attendance.has_checkin && !attendance.has_checkout) {
-      return { icon: AlertCircle, color: 'text-yellow-600', bgColor: 'bg-yellow-100', text: 'Checked In' };
-    } else if (attendance.has_checkin && attendance.has_checkout) {
-      return { icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-100', text: 'Complete' };
-    } else {
-      return { icon: Clock, color: 'text-gray-600', bgColor: 'bg-gray-100', text: 'Unknown' };
+  // Get status icon and color from backend status
+  const getStatusInfoFromBackend = (status) => {
+    switch (status) {
+      case 'present':
+        return { icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-100', text: 'Present' };
+      case 'absent':
+        return { icon: XCircle, color: 'text-red-600', bgColor: 'bg-red-100', text: 'Absent' };
+      case 'checked_in_only':
+        return { icon: AlertCircle, color: 'text-yellow-600', bgColor: 'bg-yellow-100', text: 'Checked In Only' };
+      case 'late':
+        return { icon: Clock, color: 'text-orange-600', bgColor: 'bg-orange-100', text: 'Late' };
+      case 'half_day':
+        return { icon: Timer, color: 'text-yellow-600', bgColor: 'bg-yellow-100', text: 'Half Day' };
+      default:
+        return { icon: AlertCircle, color: 'text-gray-600', bgColor: 'bg-gray-100', text: status || 'Unknown' };
     }
   };
 
-  // Format time
-  const formatTime = (timeString) => {
-    if (!timeString) return '--';
-    return new Date(timeString).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
+  // Get day status badge
+  const getDayStatusBadge = (dayStatus) => {
+    switch (dayStatus) {
+      case 'complete_day':
+        return 'bg-green-100 text-green-800';
+      case 'half_day':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'absent':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // Get late status badge
+  const getLateStatusBadge = (isLate) => {
+    return isLate ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800';
   };
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border p-8">
-        <div className="flex items-center justify-center">
-          <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
-          <span className="ml-3 text-gray-600">Loading check-in/check-out data...</span>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <RefreshCw className="w-12 h-12 text-blue-500 mx-auto mb-4 animate-spin" />
+          <p className="text-gray-500">Loading check-in/check-out data...</p>
         </div>
       </div>
     );
@@ -112,11 +143,29 @@ const CheckinCheckoutView = ({ officeId }) => {
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+      <div className="bg-red-50 border border-red-200 rounded-lg p-6">
         <div className="flex items-center">
-          <XCircle className="h-5 w-5 text-red-400" />
-          <span className="ml-2 text-red-800">{error}</span>
+          <XCircle className="h-5 w-5 text-red-400 mr-2" />
+          <div>
+            <h3 className="text-sm font-medium text-red-800">Error Loading Data</h3>
+            <p className="text-sm text-red-700 mt-1">{error}</p>
+          </div>
         </div>
+        <div className="mt-4">
+          <Button onClick={fetchData} variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data || !data.attendance_details) {
+    return (
+      <div className="text-center py-8">
+        <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+        <p className="text-gray-500">No check-in/check-out data available</p>
       </div>
     );
   }
@@ -124,204 +173,235 @@ const CheckinCheckoutView = ({ officeId }) => {
   return (
     <div className="space-y-6">
       {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Check-in/Check-out Records</h2>
+          <p className="text-gray-600">Monitor daily attendance patterns and working hours</p>
+        </div>
+        <div className="flex items-center space-x-3">
+          <Button onClick={handleExport} variant="outline">
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+        </div>
+      </div>
+
+      {/* Date Selection */}
       <div className="bg-white rounded-lg shadow-sm border p-4">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">Check-in/Check-out Details</h2>
-            <p className="text-sm text-gray-600">
-              Detailed attendance information for {data?.date ? new Date(data.date).toLocaleDateString() : 'selected date'}
-            </p>
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <Calendar className="h-5 w-5 text-gray-400" />
+            <label htmlFor="date-select" className="text-sm font-medium text-gray-700">
+              Select Date:
+            </label>
           </div>
-          
-          <div className="flex items-center space-x-3">
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={handleDateChange}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            
-            <Button
-              onClick={fetchData}
-              disabled={loading}
-              className="flex items-center space-x-2"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              <span>Refresh</span>
-            </Button>
-            
-            <Button
-              onClick={handleExport}
-              variant="outline"
-              className="flex items-center space-x-2"
-            >
-              <Download className="h-4 w-4" />
-              <span>Export</span>
-            </Button>
-          </div>
+          <input
+            id="date-select"
+            type="date"
+            value={selectedDate}
+            onChange={handleDateChange}
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <Button onClick={fetchData} variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
         </div>
       </div>
 
       {/* Summary Statistics */}
-      {data?.summary && (
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div className="bg-white rounded-lg shadow-sm border p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Employees</p>
-                <p className="text-2xl font-bold text-gray-900">{data.summary.total_employees}</p>
-              </div>
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Users className="h-6 w-6 text-blue-600" />
-              </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-lg shadow-sm border p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Employees</p>
+              <p className="text-2xl font-bold text-gray-900">{data.total_employees || 0}</p>
             </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Present</p>
-                <p className="text-2xl font-bold text-green-600">{data.summary.present_employees}</p>
-              </div>
-              <div className="p-2 bg-green-100 rounded-lg">
-                <CheckCircle className="h-6 w-6 text-green-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Checked In Only</p>
-                <p className="text-2xl font-bold text-yellow-600">{data.summary.checked_in_only}</p>
-              </div>
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <AlertCircle className="h-6 w-6 text-yellow-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Checked Out</p>
-                <p className="text-2xl font-bold text-blue-600">{data.summary.checked_out}</p>
-              </div>
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Clock className="h-6 w-6 text-blue-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Attendance Rate</p>
-                <p className="text-2xl font-bold text-purple-600">{data.summary.attendance_rate}%</p>
-              </div>
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Calendar className="h-6 w-6 text-purple-600" />
-              </div>
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Users className="h-6 w-6 text-blue-600" />
             </div>
           </div>
         </div>
-      )}
 
-      {/* Detailed Table */}
+        <div className="bg-white rounded-lg shadow-sm border p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Present Today</p>
+              <p className="text-2xl font-bold text-green-600">
+                {data.attendance_details.filter(att => att.status === 'present').length}
+              </p>
+            </div>
+            <div className="p-2 bg-green-100 rounded-lg">
+              <CheckCircle className="h-6 w-6 text-green-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Complete Days</p>
+              <p className="text-2xl font-bold text-green-600">
+                {data.attendance_details.filter(att => att.day_status === 'complete_day').length}
+              </p>
+              <p className="text-xs text-gray-500">≥ 5 hours</p>
+            </div>
+            <div className="p-2 bg-green-100 rounded-lg">
+              <CalendarDays className="h-6 w-6 text-green-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Late Coming</p>
+              <p className="text-2xl font-bold text-orange-600">
+                {data.attendance_details.filter(att => att.is_late === true).length}
+              </p>
+              <p className="text-xs text-gray-500">After 11:30 AM</p>
+            </div>
+            <div className="p-2 bg-orange-100 rounded-lg">
+              <AlertTriangle className="h-6 w-6 text-orange-600" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Enhanced Attendance Table */}
       <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Employee Attendance Details</h3>
-          <p className="text-sm text-gray-600">
-            {data?.attendance_details?.length || 0} employees • {data?.date ? new Date(data.date).toLocaleDateString() : 'selected date'}
+          <h3 className="text-lg font-medium text-gray-900">Attendance Details</h3>
+          <p className="text-sm text-gray-500">
+            {selectedDate} • {data.attendance_details.length} records
           </p>
         </div>
-
+        
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Employee
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Check In
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Check Out
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Working Hours
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Device
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check In</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check Out</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Working Hours</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Day Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Late Coming</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Device</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {data?.attendance_details?.length === 0 ? (
-                <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
-                    <Users className="mx-auto h-12 w-12 text-gray-400" />
-                    <p className="mt-2 text-sm">No attendance data found</p>
-                    <p className="text-xs">Try selecting a different date</p>
-                  </td>
-                </tr>
-              ) : (
-                data?.attendance_details?.map((attendance, index) => {
-                  const statusInfo = getStatusInfo(attendance);
-                  const StatusIcon = statusInfo.icon;
-
-                  return (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
+              {data.attendance_details.map((att, index) => {
+                const statusInfo = getStatusInfoFromBackend(att.status);
+                const StatusIcon = statusInfo.icon;
+                
+                return (
+                  <tr key={index} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                          <Users className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">
-                            {attendance.employee_name}
+                            {att.employee_name}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {attendance.employee_id_number}
+                            ID: {att.employee_id_number || 'N/A'}
                           </div>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {formatTime(attendance.check_in_time)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {formatTime(attendance.check_out_time)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {attendance.working_hours ? `${attendance.working_hours}h` : '--'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      </div>
+                    </td>
+                    
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {att.check_in_time ? (
                         <div className="flex items-center">
-                          <div className={`p-2 rounded-full ${statusInfo.bgColor}`}>
-                            <StatusIcon className={`h-4 w-4 ${statusInfo.color}`} />
-                          </div>
-                          <span className={`ml-2 text-sm font-medium ${statusInfo.color}`}>
-                            {statusInfo.text}
-                          </span>
+                          <Clock className="h-4 w-4 mr-2 text-green-500" />
+                          {new Date(att.check_in_time).toLocaleTimeString()}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {attendance.device_name || '--'}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
+                      ) : (
+                        <span className="text-gray-400">Not checked in</span>
+                      )}
+                    </td>
+                    
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {att.check_out_time ? (
+                        <div className="flex items-center">
+                          <Clock className="h-4 w-4 mr-2 text-red-500" />
+                          {new Date(att.check_out_time).toLocaleTimeString()}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">Not checked out</span>
+                      )}
+                    </td>
+                    
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {att.working_hours ? (
+                        <div className="flex items-center">
+                          <Timer className="h-4 w-4 mr-2 text-blue-500" />
+                          <span className="font-medium">{att.working_hours}h</span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">N/A</span>
+                      )}
+                    </td>
+                    
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <StatusIcon className={`h-4 w-4 mr-2 ${statusInfo.color}`} />
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusInfo.bgColor} ${statusInfo.color}`}>
+                          {statusInfo.text}
+                        </span>
+                      </div>
+                    </td>
+                    
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getDayStatusBadge(att.day_status)}`}>
+                        {att.day_status ? att.day_status.replace('_', ' ').toUpperCase() : 'N/A'}
+                      </span>
+                    </td>
+                    
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                          att.is_late ? 'bg-orange-100' : 'bg-gray-100'
+                        }`}>
+                          {att.is_late ? (
+                            <AlertTriangle className="w-3 h-3 text-orange-600" />
+                          ) : (
+                            <CheckCircle className="w-3 h-3 text-gray-600" />
+                          )}
+                        </div>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getLateStatusBadge(att.is_late)}`}>
+                          {att.is_late ? 'Late' : 'On Time'}
+                        </span>
+                        {att.is_late && att.late_minutes && (
+                          <div className="text-xs text-orange-600">
+                            {att.late_minutes} min
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {att.device_name || 'N/A'}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* No Data State */}
+      {data.attendance_details.length === 0 && (
+        <div className="text-center py-8">
+          <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-500">No attendance records found for {selectedDate}</p>
+        </div>
+      )}
     </div>
   );
 };

@@ -27,7 +27,7 @@ class RealtimeAttendanceService {
    */
   startPolling(options = {}) {
     if (this.isPolling) {
-      console.warn('Real-time attendance polling is already active');
+      // console.warn('Real-time attendance polling is already active');
       return;
     }
 
@@ -44,7 +44,7 @@ class RealtimeAttendanceService {
     if (onError) this.callbacks.onError = onError;
 
     this.isPolling = true;
-    console.log(`Starting real-time attendance polling every ${interval}ms`);
+    // console.log(`Starting real-time attendance polling every ${interval}ms`);
 
     // Initial fetch
     this.fetchAttendanceData();
@@ -64,7 +64,7 @@ class RealtimeAttendanceService {
       this.pollingInterval = null;
     }
     this.isPolling = false;
-    console.log('Stopped real-time attendance polling');
+    // console.log('Stopped real-time attendance polling');
   }
 
   /**
@@ -91,7 +91,7 @@ class RealtimeAttendanceService {
       }
 
     } catch (error) {
-      console.error('Error fetching attendance data:', error);
+      // console.error('Error fetching attendance data:', error);
       if (this.callbacks.onError) {
         this.callbacks.onError(error);
       }
@@ -108,7 +108,7 @@ class RealtimeAttendanceService {
       try {
         deviceStatus = await api.getZKTecoDeviceStatus();
       } catch (error) {
-        console.warn('Failed to get ZKTeco device status:', error.message);
+        // console.warn('Failed to get ZKTeco device status:', error.message);
         // Return offline status for all devices
         deviceStatus = {
           devices: [
@@ -129,7 +129,7 @@ class RealtimeAttendanceService {
           end_date: new Date().toISOString().split('T')[0]
         });
       } catch (error) {
-        console.warn('Failed to sync ZKTeco devices:', error.message);
+        // console.warn('Failed to sync ZKTeco devices:', error.message);
         syncResult = {
           message: 'Device sync failed - devices may be offline',
           total_synced: 0,
@@ -148,7 +148,7 @@ class RealtimeAttendanceService {
         timestamp: new Date()
       };
     } catch (error) {
-      console.error('Error in fetchZKTecoData:', error);
+      // console.error('Error in fetchZKTecoData:', error);
       // Return offline status as fallback
       return {
         deviceStatus: {
@@ -200,7 +200,7 @@ class RealtimeAttendanceService {
     }
 
     if (changes.length > 0) {
-      console.log('Fingerprint changes detected:', changes);
+      // console.log('Fingerprint changes detected:', changes);
       
       // Trigger fingerprint detection callback
       if (this.callbacks.onFingerprintDetected) {

@@ -1,397 +1,695 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Button } from '../../Components';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Card, Button, Input, Select } from '../index';
 import { 
-  Calendar, 
-  Clock, 
-  User, 
   ChevronLeft, 
-  ChevronRight,
-  Download,
-  Filter
+  ChevronRight, 
+  Download, 
+  Search, 
+  Edit3,
+  Check,
+  X,
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react';
 import api from '../../services/api';
-import { formatDateWithDay, formatTime, getMonthName } from '../../utils/dateUtils';
 
-const EmployeeAttendanceView = ({ employee, onBack }) => {
-  const [attendance, setAttendance] = useState([]);
+// Toast Notification Component
+const Toast = ({ message, type, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 4000); // Auto close after 4 seconds
+
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  if (!message) return null;
+
+  return (
+    <div className="fixed top-4 right-4 z-50 max-w-sm w-full">
+      <div className={`rounded-lg shadow-lg p-4 flex items-center space-x-3 ${
+        type === 'success' 
+          ? 'bg-green-50 border border-green-200' 
+          : 'bg-red-50 border border-red-200'
+      }`}>
+        <div className={`flex-shrink-0 ${
+          type === 'success' ? 'text-green-400' : 'text-red-400'
+        }`}>
+          {type === 'success' ? (
+            <CheckCircle className="h-5 w-5" />
+          ) : (
+            <AlertCircle className="h-5 w-5" />
+          )}
+        </div>
+        <div className="flex-1">
+          <p className={`text-sm font-medium ${
+            type === 'success' ? 'text-green-800' : 'text-red-800'
+          }`}>
+            {message}
+          </p>
+        </div>
+        <button
+          onClick={onClose}
+          className={`flex-shrink-0 ${
+            type === 'success' 
+              ? 'text-green-400 hover:text-green-600' 
+              : 'text-red-400 hover:text-red-600'
+          }`}
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const EmployeeAttendanceView = ({ selectedEmployee }) => {
+  const [attendanceData, setAttendanceData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  const [viewMode, setViewMode] = useState('monthly'); // monthly, previous
-  const [statusFilter, setStatusFilter] = useState('all'); // all, present, absent
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [stats, setStats] = useState({
-    present: 0,
-    absent: 0,
-    total: 0
+    totalDaysInMonth: 0,
+    presentDays: 0,
+    absentDays: 0,
+    completeDays: 0,
+    halfDays: 0,
+    lateComingDays: 0,
+    attendanceRate: 0
+  });
+  const [editingRow, setEditingRow] = useState(null);
+  const [editForm, setEditForm] = useState({
+    status: '',
+    dayStatus: '',
+    notes: ''
   });
 
-  useEffect(() => {
-    if (employee) {
-      fetchEmployeeAttendance();
-    }
-  }, [employee, currentMonth, currentYear, viewMode]);
+  // Calculate current date for the selected month
+  const currentDate = useMemo(() => {
+    return new Date(currentYear, currentMonth - 1, 1);
+  }, [currentYear, currentMonth]);
 
-  // Ensure stats are updated when month/year changes
-  useEffect(() => {
-    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-    setStats(prevStats => ({
-      ...prevStats,
-      total: daysInMonth
-    }));
-  }, [currentMonth, currentYear]);
+  // Calculate start and end dates for the month
+  const { startDate, endDate } = useMemo(() => {
+    const startDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+    const endDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${new Date(currentYear, currentMonth, 0).getDate()}`;
+    return { startDate, endDate };
+  }, [currentYear, currentMonth]);
 
-  const fetchEmployeeAttendance = async () => {
+  // Fetch employee attendance data
+  const fetchEmployeeAttendance = useCallback(async () => {
+    if (!selectedEmployee) return;
+
+    setLoading(true);
+    setError(null);
+    setSuccessMessage(null); // Clear any previous success messages
+
+    console.log('🔍 Fetching attendance for:', {
+      employeeId: selectedEmployee.id,
+      selectedEmployee: selectedEmployee,
+      startDate,
+      endDate,
+      year: currentYear,
+      month: currentMonth
+    });
+
     try {
-      setLoading(true);
-      let response;
+      // Check if we have authentication token
+      const token = localStorage.getItem('access_token');
+      console.log('🔑 Auth token available:', !!token);
+      console.log('🔑 Token preview:', token ? `${token.substring(0, 20)}...` : 'None');
       
-      if (viewMode === 'monthly') {
-        response = await api.getMonthlyAttendance(currentMonth + 1, currentYear, {
-          user: employee.id
+      // Test API connection first
+      try {
+        const testResponse = await fetch(`https://company.d0s369.co.in/api/attendance/monthly_attendance/?user=${selectedEmployee.id}&year=${currentYear}&month=${currentMonth}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         });
+        console.log('🧪 Test API response status:', testResponse.status);
+        if (testResponse.ok) {
+          const testData = await testResponse.json();
+          console.log('🧪 Test API response data:', testData);
+        } else {
+          console.error('🧪 Test API failed:', testResponse.status, testResponse.statusText);
+          const errorText = await testResponse.text();
+          console.error('🧪 Test API error response:', errorText);
+        }
+      } catch (testError) {
+        console.error('🧪 Test API error:', testError);
+      }
+      
+      const response = await api.getEmployeeAttendance(
+        selectedEmployee.id,
+        startDate,
+        endDate
+      );
+
+      console.log('✅ Attendance data received:', response);
+
+      // The API returns data directly, not wrapped in success/data structure
+      if (response && response.monthly_data) {
+        setAttendanceData(response.monthly_data || []);
         
-                 // Handle monthly response structure
-         if (response.attendance_records) {
-           setAttendance(response.attendance_records);
-           // Ensure we have the correct total days calculation
-           const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-           setStats({
-             present: response.statistics?.present_days || 0,
-             absent: response.statistics?.absent_days || (daysInMonth - (response.statistics?.present_days || 0)),
-             total: response.statistics?.total_days_in_month || daysInMonth
-           });
-         } else {
-           setAttendance(response.results || response);
-           calculateStats(response.results || response);
-         }
+        // Update statistics - remove working days, present days = working days
+        const statistics = response.statistics || {};
+        setStats({
+          totalDaysInMonth: statistics.total_days_in_month || 0,
+          presentDays: statistics.present_days || 0,
+          absentDays: statistics.absent_days || 0,
+          completeDays: statistics.complete_days || 0,
+          halfDays: statistics.half_days || 0,
+          lateComingDays: statistics.late_coming_days || 0,
+          attendanceRate: statistics.attendance_rate || 0
+        });
       } else {
-        // For previous months, get last 3 months
-        const endDate = new Date(currentYear, currentMonth + 1, 0);
-        const startDate = new Date(currentYear, currentMonth - 2, 1);
-        
-        response = await api.getAttendanceReport(
-          startDate.toISOString().split('T')[0],
-          endDate.toISOString().split('T')[0],
-          { user: employee.id }
-        );
-        
-        setAttendance(response.results || response);
-        calculateStats(response.results || response);
+        console.error('❌ API response indicates failure:', response);
+        setError('Failed to fetch attendance data');
       }
     } catch (error) {
-      console.error('Failed to fetch employee attendance:', error);
+      console.error('❌ Error fetching attendance:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        statusText: error.response?.statusText
+      });
+      setError(`Error fetching attendance data: ${error.message}`);
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedEmployee, startDate, endDate, currentYear, currentMonth]);
 
-  const calculateStats = (attendanceData) => {
-    // Calculate total days in month
-    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-    const present = attendanceData.filter(a => a.status === 'present').length;
-    const absent = daysInMonth - present; // Correct calculation: Total Days - Present Days = Absent Days
-    
-    console.log('calculateStats:', {
-      currentYear,
-      currentMonth,
-      daysInMonth,
-      present,
-      absent,
-      attendanceDataLength: attendanceData.length
-    });
-    
-    setStats({ 
-      present, 
-      absent, 
-      total: daysInMonth // Total days in month
-    });
-  };
-
-  const changeMonth = (direction) => {
-    if (direction === 'next') {
-      if (currentMonth === 11) {
-        setCurrentMonth(0);
-        setCurrentYear(currentYear + 1);
-      } else {
-        setCurrentMonth(currentMonth + 1);
-      }
-    } else {
-      if (currentMonth === 0) {
-        setCurrentMonth(11);
+  // Handle month navigation
+  const handleMonthChange = useCallback((direction) => {
+    if (direction === 'prev') {
+      if (currentMonth === 1) {
+        setCurrentMonth(12);
         setCurrentYear(currentYear - 1);
       } else {
         setCurrentMonth(currentMonth - 1);
       }
-    }
-  };
-
-  const getStatusBadge = (status) => {
-    const badges = {
-      present: 'bg-green-100 text-green-800',
-      absent: 'bg-red-100 text-red-800',
-      late: 'bg-yellow-100 text-yellow-800',
-      half_day: 'bg-orange-100 text-orange-800',
-      leave: 'bg-blue-100 text-blue-800'
-    };
-    return badges[status] || 'bg-gray-100 text-gray-800';
-  };
-
-  const getFilteredAttendance = () => {
-    if (statusFilter === 'all') {
-      return attendance;
-    }
-    return attendance.filter(record => record.status === statusFilter);
-  };
-
-  // Generate complete month view with all days (present and absent)
-  const generateCompleteMonthView = () => {
-    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-    const completeMonth = [];
-    
-    for (let day = 1; day <= daysInMonth; day++) {
-      const currentDate = new Date(currentYear, currentMonth, day);
-      const dateString = currentDate.toISOString().split('T')[0];
-      
-      // Find if there's an attendance record for this day
-      const attendanceRecord = attendance.find(record => {
-        const recordDate = new Date(record.date);
-        return recordDate.getDate() === day && 
-               recordDate.getMonth() === currentMonth && 
-               recordDate.getFullYear() === currentYear;
-      });
-      
-      if (attendanceRecord) {
-        // Present day - use actual attendance record
-        completeMonth.push({
-          ...attendanceRecord,
-          isPresent: true,
-          displayDate: currentDate
-        });
+    } else {
+      if (currentMonth === 12) {
+        setCurrentMonth(1);
+        setCurrentYear(currentYear + 1);
       } else {
-        // Absent day - create a placeholder record
-        completeMonth.push({
-          id: `absent-${day}`,
-          date: dateString,
-          check_in_time: null,
-          check_out_time: null,
-          total_hours: 0,
-          status: 'absent',
-          notes: 'No attendance record',
-          isPresent: false,
-          displayDate: currentDate
-        });
+        setCurrentMonth(currentMonth + 1);
       }
     }
-    
-    return completeMonth;
-  };
+  }, [currentMonth, currentYear]);
 
+  // Handle status editing
+  const handleEditClick = useCallback((row) => {
+    console.log('🔧 Starting edit for row:', row);
+    setEditingRow(row);
+    setError(null); // Clear any previous errors
+    setSuccessMessage(null); // Clear any previous success messages
+    setEditForm({
+      status: row.status || 'absent',
+      dayStatus: row.day_status || 'absent',
+      notes: row.notes || ''
+    });
+  }, []);
 
+  const handleEditCancel = useCallback(() => {
+    setEditingRow(null);
+    setError(null); // Clear any previous errors
+    setSuccessMessage(null); // Clear any previous success messages
+    setEditForm({
+      status: '',
+      dayStatus: '',
+      notes: ''
+    });
+  }, []);
 
-  const exportEmployeeAttendance = () => {
-    const monthNames = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    
+  const handleEditSave = useCallback(async () => {
+    if (!editingRow || !selectedEmployee) return;
+
+    // Validate the form data
+    if (!editForm.status || !editForm.dayStatus) {
+      setError('Status and Day Status are required');
+      return;
+    }
+
+    if (!['present', 'absent'].includes(editForm.status)) {
+      setError('Invalid status value. Must be "present" or "absent"');
+      return;
+    }
+
+    if (!['complete_day', 'half_day', 'absent'].includes(editForm.dayStatus)) {
+      setError('Invalid day status value. Must be "complete_day", "half_day", or "absent"');
+      return;
+    }
+
+    console.log('🔧 Updating attendance status:', {
+      employeeId: selectedEmployee.id,
+      date: editingRow.date,
+      dateType: typeof editingRow.date,
+      dateValue: editingRow.date,
+      status: editForm.status,
+      dayStatus: editForm.dayStatus,
+      notes: editForm.notes
+    });
+
+    try {
+      // Ensure date is in YYYY-MM-DD format
+      let formattedDate = editingRow.date;
+      if (typeof editingRow.date === 'string') {
+        // If it's already a string, make sure it's in the right format
+        const dateObj = new Date(editingRow.date);
+        if (!isNaN(dateObj.getTime())) {
+          formattedDate = dateObj.toISOString().split('T')[0];
+        }
+      } else if (editingRow.date instanceof Date) {
+        formattedDate = editingRow.date.toISOString().split('T')[0];
+      }
+
+      console.log('📅 Formatted date:', formattedDate);
+
+      const result = await api.updateAttendanceStatus(
+        selectedEmployee.id,
+        formattedDate,
+        editForm.status,
+        editForm.dayStatus,
+        editForm.notes
+      );
+
+      console.log('✅ Status update result:', result);
+
+      // Handle both direct response and wrapped response formats
+      let responseData = result;
+      if (result && result.success && result.data) {
+        // Wrapped response format: { success: true, data: {...} }
+        responseData = result.data;
+      }
+
+      if (responseData && (responseData.id || responseData.message)) {
+        // Update the local data
+        setAttendanceData(prevData => 
+          prevData.map(item => 
+            item.date === editingRow.date 
+              ? { 
+                  ...item, 
+                  status: editForm.status, 
+                  day_status: editForm.dayStatus,
+                  notes: editForm.notes,
+                  id: responseData.id || item.id
+                }
+              : item
+          )
+        );
+
+        // Refresh data to get updated statistics
+        await fetchEmployeeAttendance();
+        
+        // Show success message
+        setError(null); // Clear any previous errors
+        try {
+          const displayDate = new Date(editingRow.date).toLocaleDateString();
+          setSuccessMessage(`✅ Attendance status updated successfully for ${displayDate}!`);
+        } catch (dateError) {
+          // Fallback if date formatting fails
+          setSuccessMessage(`✅ Attendance status updated successfully!`);
+        }
+        
+        setEditingRow(null);
+        setEditForm({
+          status: '',
+          dayStatus: '',
+          notes: ''
+        });
+      } else {
+        console.error('❌ Invalid response structure:', result);
+        setError('Failed to update status - invalid response from server');
+      }
+    } catch (error) {
+      console.error('❌ Error updating status:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        statusText: error.response?.statusText
+      });
+      
+      // Show more specific error message
+      if (error.response?.data?.error) {
+        setError(`❌ Server error: ${error.response.data.error}`);
+      } else if (error.response?.status === 403) {
+        setError('❌ Permission denied. Only managers and admins can update attendance status.');
+      } else if (error.response?.status === 400) {
+        setError('❌ Invalid data. Please check the status and day status values.');
+      } else if (error.response?.status === 404) {
+        setError('❌ User not found or inactive.');
+      } else {
+        setError(`❌ Error updating attendance status: ${error.message}`);
+      }
+    }
+  }, [editingRow, editForm, selectedEmployee, fetchEmployeeAttendance]);
+
+  // Get status badge styling
+  const getStatusBadge = useCallback((status) => {
+    if (status === 'absent') {
+      return 'bg-red-100 text-red-800';
+    }
+    return 'bg-green-100 text-green-800';
+  }, []);
+
+  // Get day status badge styling
+  const getDayStatusBadge = useCallback((dayStatus) => {
+    switch (dayStatus) {
+      case 'complete_day':
+        return 'bg-blue-100 text-blue-800';
+      case 'half_day':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'absent':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  }, []);
+
+  // Export to CSV
+  const exportToCSV = useCallback(() => {
+    if (!attendanceData.length) return;
+
+    const monthName = new Date(currentYear, currentMonth - 1, 1).toLocaleString('default', { month: 'long' });
+    const filename = `${selectedEmployee.first_name}_${selectedEmployee.last_name}_attendance_${monthName}_${currentYear}.csv`;
+
     const csvContent = [
-      ['Employee', 'Date', 'Check In', 'Check Out', 'Status', 'Total Hours', 'Notes'],
-      ...attendance.map(record => [
-        `${employee.first_name} ${employee.last_name}`,
-        record.date,
-        formatTime(record.check_in_time),
-        formatTime(record.check_out_time),
-        record.status,
-        record.total_hours || 'N/A',
-        record.notes || ''
+      ['Date', 'Status', 'Day Status', 'Check In', 'Check Out', 'Total Hours', 'Late', 'Notes'],
+      ...attendanceData.map(attendance => [
+        attendance.date,
+        attendance.status === 'absent' ? 'Absent' : 'Present',
+        attendance.day_status || 'N/A',
+        attendance.check_in_time ? new Date(attendance.check_in_time).toLocaleTimeString() : 'N/A',
+        attendance.check_out_time ? new Date(attendance.check_out_time).toLocaleTimeString() : 'N/A',
+        attendance.total_hours || 'N/A',
+        attendance.is_late ? 'Yes' : 'No',
+        attendance.notes || ''
       ])
-    ].map(row => row.join(',')).join('\n');
+    ].map(row => row.map(field => `"${field}"`).join(',')).join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const monthDisplay = getMonthName(currentMonth);
-    a.download = `${employee.first_name}_${employee.last_name}_attendance_${monthDisplay}_${currentYear}.csv`;
+    a.download = filename;
     a.click();
     window.URL.revokeObjectURL(url);
-  };
+  }, [attendanceData, currentYear, currentMonth, selectedEmployee]);
 
+  // Fetch data when component mounts or parameters change
+  useEffect(() => {
+    fetchEmployeeAttendance();
+  }, [fetchEmployeeAttendance]);
 
+  // Monitor year and month changes
+  useEffect(() => {
+    fetchEmployeeAttendance();
+  }, [currentYear, currentMonth]);
+
+  if (!selectedEmployee) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-gray-500">Please select an employee to view attendance</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
+      {/* Toast Notifications */}
+      <Toast 
+        message={successMessage} 
+        type="success" 
+        onClose={() => setSuccessMessage(null)} 
+      />
+      <Toast 
+        message={error} 
+        type="error" 
+        onClose={() => setError(null)} 
+      />
+      
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button onClick={onBack} variant="outline" size="sm">
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              {employee.first_name} {employee.last_name}
-            </h2>
-            <p className="text-sm text-gray-600">
-              Employee ID: {employee.employee_id || 'Not assigned'}
-            </p>
-          </div>
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">
+            {selectedEmployee.first_name} {selectedEmployee.last_name} - Attendance
+          </h2>
+          <p className="text-gray-600">
+            Employee ID: {selectedEmployee.employee_id} • Department: {selectedEmployee.department}
+          </p>
         </div>
-        <Button onClick={exportEmployeeAttendance} variant="outline">
-          <Download className="h-4 w-4 mr-2" />
-          Export
+        <Button onClick={exportToCSV} className="bg-green-600 hover:bg-green-700">
+          <Download className="w-4 h-4 mr-2" />
+          Export CSV
         </Button>
-      </div>
-
-      {/* View Mode Toggle */}
-      <div className="flex items-center space-x-4">
-        <div className="flex bg-gray-100 rounded-lg p-1">
-          <button
-            onClick={() => setViewMode('monthly')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'monthly'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Monthly View
-          </button>
-          <button
-            onClick={() => setViewMode('previous')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'previous'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Previous Months
-          </button>
-        </div>
       </div>
 
       {/* Month Navigation */}
-      <div className="flex items-center justify-between">
-        <Button onClick={() => changeMonth('prev')} variant="outline" size="sm">
-          <ChevronLeft className="h-4 w-4 mr-2" />
-          Previous
+      <div className="flex items-center justify-between bg-white p-4 rounded-lg shadow">
+        <Button
+          onClick={() => handleMonthChange('prev')}
+          variant="outline"
+          size="sm"
+        >
+          <ChevronLeft className="w-4 h-4" />
         </Button>
-        <h3 className="text-lg font-medium text-gray-900">
-          {getMonthName(currentMonth)} {currentYear}
-        </h3>
-        <Button onClick={() => changeMonth('next')} variant="outline" size="sm">
-          Next
-          <ChevronRight className="h-4 w-4 ml-2" />
-        </Button>
-      </div>
-
-
-      {/* Simple Statistics */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="p-6">
-          <div className="text-center">
-            <div className="text-3xl font-bold text-blue-600">
-              {stats.total || new Date(currentYear, currentMonth + 1, 0).getDate()}
-            </div>
-            <div className="text-lg text-gray-600">Total Days in Month</div>
-            <div className="text-sm text-gray-500 mt-1">{getMonthName(currentMonth)} {currentYear}</div>
-          </div>
-        </Card>
-        <Card className="p-6">
-          <div className="text-center">
-            <div className="text-3xl font-bold text-green-600">{stats.present}</div>
-            <div className="text-lg text-gray-600">Present Days</div>
-            <div className="text-sm text-gray-500 mt-1">{getMonthName(currentMonth)} {currentYear}</div>
-          </div>
-        </Card>
-        <Card className="p-6">
-          <div className="text-center">
-            <div className="text-3xl font-bold text-red-600">{stats.absent}</div>
-            <div className="text-lg text-gray-600">Absent Days</div>
-            <div className="text-sm text-gray-500 mt-1">{getMonthName(currentMonth)} {currentYear}</div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Filter Controls */}
-      <div className="flex items-center justify-between bg-white p-4 rounded-lg border">
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <Filter className="h-4 w-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-700">Filter by Status:</span>
-          </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="all">All Records</option>
-            <option value="present">Present Only</option>
-            <option value="absent">Absent Only</option>
-          </select>
+        
+        <div className="text-center">
+          <h3 className="text-xl font-semibold text-gray-900">
+            {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+          </h3>
+          <p className="text-sm text-gray-600">
+            {stats.totalDaysInMonth} total days • {stats.presentDays} present days • {attendanceData.length} records
+          </p>
         </div>
-                 <div className="text-sm text-gray-600">
-           Showing {generateCompleteMonthView().length} days for {getMonthName(currentMonth)} {currentYear}
-         </div>
+        
+        <Button
+          onClick={() => handleMonthChange('next')}
+          variant="outline"
+          size="sm"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </Button>
       </div>
 
-      {/* Attendance Table */}
-      <Card className="p-6">
-        {loading ? (
-          <div className="flex items-center justify-center h-32">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+        <Card className="text-center">
+          <div className="p-4">
+            <h4 className="text-sm font-medium text-gray-500">Total Days</h4>
+            <p className="text-2xl font-bold text-gray-900">{stats.totalDaysInMonth}</p>
           </div>
-                 ) : generateCompleteMonthView().length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check In</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check Out</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Hours</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
-                </tr>
-              </thead>
-                             <tbody className="bg-white divide-y divide-gray-200">
-                                  {generateCompleteMonthView().map((record) => (
-                   <tr key={record.id} className={`hover:bg-gray-50 ${!record.isPresent ? 'bg-red-50' : ''}`}>
-                     <td className={`px-6 py-4 whitespace-nowrap text-sm ${!record.isPresent ? 'text-red-900 font-medium' : 'text-gray-900'}`}>
-                       {formatDateWithDay(record.date)}
-                     </td>
-                     <td className={`px-6 py-4 whitespace-nowrap text-sm ${!record.isPresent ? 'text-red-600' : 'text-gray-600'}`}>
-                       {record.isPresent ? formatTime(record.check_in_time) : 'Not Checked In'}
-                     </td>
-                     <td className={`px-6 py-4 whitespace-nowrap text-sm ${!record.isPresent ? 'text-red-600' : 'text-gray-600'}`}>
-                       {record.isPresent ? formatTime(record.check_out_time) : 'Not Checked Out'}
-                     </td>
-                     <td className={`px-6 py-4 whitespace-nowrap text-sm ${!record.isPresent ? 'text-red-600' : 'text-gray-600'}`}>
-                       {record.isPresent ? (record.total_hours ? `${record.total_hours}h` : 'N/A') : '0h'}
-                     </td>
-                     <td className="px-6 py-4 whitespace-nowrap">
-                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(record.status)}`}>
-                         {record.status}
-                       </span>
-                     </td>
-                     <td className={`px-6 py-4 text-sm ${!record.isPresent ? 'text-red-600' : 'text-gray-600'}`}>
-                       {record.notes || '-'}
-                     </td>
-                   </tr>
-                 ))}
-              </tbody>
-            </table>
+        </Card>
+        
+        <Card className="text-center">
+          <div className="p-4">
+            <h4 className="text-sm font-medium text-gray-500">Present Days</h4>
+            <p className="text-2xl font-bold text-green-600">{stats.presentDays}</p>
           </div>
-        ) : (
-          <div className="text-center py-12">
-            <Calendar className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">
-              No days to display
+        </Card>
+        
+        <Card className="text-center">
+          <div className="p-4">
+            <h4 className="text-sm font-medium text-gray-500">Absent Days</h4>
+            <p className="text-2xl font-bold text-red-600">{stats.absentDays}</p>
+          </div>
+        </Card>
+        
+        <Card className="text-center">
+          <div className="p-4">
+            <h4 className="text-sm font-medium text-gray-500">Complete Days</h4>
+            <p className="text-2xl font-bold text-blue-600">{stats.completeDays}</p>
+          </div>
+        </Card>
+        
+        <Card className="text-center">
+          <div className="p-4">
+            <h4 className="text-sm font-medium text-gray-500">Half Days</h4>
+            <p className="text-2xl font-bold text-yellow-600">{stats.halfDays}</p>
+          </div>
+        </Card>
+        
+        <Card className="text-center">
+          <div className="p-4">
+            <h4 className="text-sm font-medium text-gray-500">Attendance Rate</h4>
+            <p className="text-2xl font-bold text-indigo-600">{stats.attendanceRate}%</p>
+          </div>
+        </Card>
+      </div>
+
+      
+
+      {/* Detailed Attendance Records */}
+      <Card>
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Detailed Attendance Records
             </h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Unable to generate month view for {getMonthName(currentMonth)} {currentYear}
+            <p className="text-sm text-gray-600">
+              Showing {attendanceData.length} records • Frontend Month: {currentMonth} • Total Days: {stats.totalDaysInMonth}
             </p>
           </div>
-        )}
+
+          {loading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-2 text-gray-600">Loading attendance data...</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Day Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Check In
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Check Out
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Total Hours
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Late
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {attendanceData.map((attendance, index) => (
+                    <tr key={attendance.id || `absent-${index}`} className="hover:bg-gray-50">
+                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                         <div>
+                           <div className="font-medium">
+                             {new Date(attendance.date).toLocaleDateString('en-US', { 
+                               weekday: 'short',
+                               month: 'short',
+                               day: 'numeric'
+                             })}
+                           </div>
+                           <div className="text-xs text-gray-500">
+                             {new Date(attendance.date).toLocaleDateString('en-US', { 
+                               year: 'numeric'
+                             })}
+                           </div>
+                         </div>
+                       </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {editingRow?.date === attendance.date ? (
+                          <Select
+                            value={editForm.status}
+                            onChange={(e) => setEditForm(prev => ({ ...prev, status: e.target.value }))}
+                            className="w-24"
+                          >
+                            <option value="present">Present</option>
+                            <option value="absent">Absent</option>
+                          </Select>
+                        ) : (
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(attendance.status)}`}>
+                            {attendance.status === 'absent' ? 'ABSENT' : 'PRESENT'}
+                          </span>
+                        )}
+                      </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {editingRow?.date === attendance.date ? (
+                          <Select
+                            value={editForm.dayStatus}
+                            onChange={(e) => setEditForm(prev => ({ ...prev, dayStatus: e.target.value }))}
+                            className="w-32"
+                          >
+                            <option value="complete_day">Complete Day</option>
+                            <option value="half_day">Half Day</option>
+                            <option value="absent">Absent</option>
+                          </Select>
+                        ) : (
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getDayStatusBadge(attendance.day_status)}`}>
+                            {attendance.day_status?.replace('_', ' ').toUpperCase() || 'N/A'}
+                          </span>
+                        )}
+                      </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {attendance.check_in_time 
+                          ? new Date(attendance.check_in_time).toLocaleTimeString() 
+                          : 'N/A'
+                        }
+                      </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {attendance.check_out_time 
+                          ? new Date(attendance.check_out_time).toLocaleTimeString() 
+                          : 'N/A'
+                        }
+                      </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {attendance.total_hours ? `${attendance.total_hours}h` : 'N/A'}
+                      </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          attendance.is_late ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                        }`}>
+                          {attendance.is_late ? 'Yes' : 'No'}
+                        </span>
+                      </td>
+                      
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        {editingRow?.date === attendance.date ? (
+                          <div className="flex space-x-2">
+                            <Button
+                              onClick={handleEditSave}
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              <Check className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              onClick={handleEditCancel}
+                              size="sm"
+                              variant="outline"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            onClick={() => handleEditClick(attendance)}
+                            size="sm"
+                            variant="outline"
+                            className="text-blue-600 hover:text-blue-700"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </Card>
     </div>
   );

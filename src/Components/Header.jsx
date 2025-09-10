@@ -2,17 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import { 
-  Bell, 
-  Search, 
-  User, 
-  Settings, 
+  User,
   LogOut,
   ChevronDown,
   Menu,
   Building2,
-  Users,
-  Calendar,
-  Clock
 } from 'lucide-react';
 
 const Header = ({ onMenuClick, sidebarOpen }) => {
@@ -121,13 +115,13 @@ const Header = ({ onMenuClick, sidebarOpen }) => {
   };
 
   return (
-    <header className="bg-white shadow-lg border-b-2 border-gray-200 z-40">
-      <div className="flex items-center justify-between h-20 px-6 sm:px-8 lg:px-10">
+    <header className="bg-white shadow-sm border-b border-gray-200 z-40">
+      <div className="flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8">
         {/* Left side - Menu button and search */}
         <div className="flex items-center space-x-6">
           <button
             onClick={onMenuClick}
-            className="lg:hidden p-3 rounded-xl text-gray-500 hover:text-gray-700 hover:bg-gradient-to-r hover:from-gray-100 hover:to-blue-50 transition-all duration-300 shadow-sm"
+            className="lg:hidden p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-all duration-200"
           >
             <Menu className="h-6 w-6" />
           </button>
@@ -139,11 +133,11 @@ const Header = ({ onMenuClick, sidebarOpen }) => {
                 <Building2 className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-gray-900">
-                  {user?.office?.name || 'Office Management'}
+                <h1 className="text-base font-semibold text-gray-900">
+                  {user?.office_name || 'Office Management'}
                 </h1>
-                <p className="text-sm text-gray-600">
-                  {user?.office?.address || 'Manager Dashboard'}
+                <p className="text-xs text-gray-600">
+                  {user?.office_address || 'Manager Dashboard'}
                 </p>
               </div>
             </div>
@@ -156,8 +150,8 @@ const Header = ({ onMenuClick, sidebarOpen }) => {
                 <Building2 className="h-4 w-4 text-white" />
               </div>
               <div>
-                <h2 className="text-sm font-bold text-gray-900">
-                  {user?.office?.name || 'Office'}
+                <h2 className="text-xs font-semibold text-gray-900">
+                  {user?.office_name || 'Office'}
                 </h2>
               </div>
             </div>
@@ -173,20 +167,20 @@ const Header = ({ onMenuClick, sidebarOpen }) => {
           <div className="relative" ref={userMenuRef}>
             <button
               onClick={toggleUserMenu}
-              className="flex items-center space-x-4 p-3 rounded-xl text-gray-500 hover:text-gray-700 hover:bg-gradient-to-r hover:from-gray-100 hover:to-blue-50 transition-all duration-300 shadow-sm"
+              className="flex items-center space-x-3 p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-all duration-200"
             >
               <div className="h-10 w-10 rounded-xl bg-gradient-to-r from-green-500 to-blue-600 flex items-center justify-center shadow-md">
                 <User className="h-5 w-5 text-white" />
               </div>
               <div className="hidden md:block text-left">
-                <p className="text-sm font-semibold text-gray-900">
+                <p className="text-xs font-semibold text-gray-900">
                   {user?.first_name && user?.last_name 
                     ? `${user.first_name} ${user.last_name}` 
                     : user?.username || 'Manager'
                   }
                 </p>
                 <p className="text-xs text-gray-500">
-                  {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Manager'} • {user?.email || 'manager@example.com'}
+                  {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Manager'}
                 </p>
               </div>
               <ChevronDown className="h-4 w-4" />
@@ -208,14 +202,8 @@ const Header = ({ onMenuClick, sidebarOpen }) => {
                       {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Manager'} • {user?.office?.name || 'Office Management'}
                     </p>
                   </div>
-                  <button className="flex items-center w-full px-6 py-3 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 transition-all duration-200">
-                    <User className="mr-3 h-4 w-4" />
-                    Profile
-                  </button>
-                  <button className="flex items-center w-full px-6 py-3 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 transition-all duration-200">
-                    <Settings className="mr-3 h-4 w-4" />
-                    Settings
-                  </button>
+              
+                 
                   <div className="border-t border-gray-200">
                     <button
                       onClick={handleLogout}

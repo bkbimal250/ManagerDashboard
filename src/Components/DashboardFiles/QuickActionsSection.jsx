@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card } from '../../Components';
 import { QuickActionCard } from '../../Components';
-import { UserPlus, Clock, Calendar } from 'lucide-react';
+import { UserPlus, Clock, Calendar, FileText, BarChart3, Settings } from 'lucide-react';
 
 const QuickActionsSection = ({ onQuickAction }) => {
   const quickActions = [
@@ -13,8 +13,8 @@ const QuickActionsSection = ({ onQuickAction }) => {
       action: 'add-employee'
     },
     {
-      title: 'Mark Attendance',
-      subtitle: 'Record attendance',
+      title: 'View Attendance',
+      subtitle: 'Check office attendance',
       icon: Clock,
       color: 'green',
       action: 'attendance'
@@ -25,6 +25,27 @@ const QuickActionsSection = ({ onQuickAction }) => {
       icon: Calendar,
       color: 'yellow',
       action: 'leaves'
+    },
+    {
+      title: 'Generate Reports',
+      subtitle: 'Office performance reports',
+      icon: BarChart3,
+      color: 'purple',
+      action: 'reports'
+    },
+    {
+      title: 'Manage Documents',
+      subtitle: 'Office document management',
+      icon: FileText,
+      color: 'indigo',
+      action: 'documents'
+    },
+    {
+      title: 'Office Settings',
+      subtitle: 'Configure office settings',
+      icon: Settings,
+      color: 'gray',
+      action: 'settings'
     }
   ];
 
@@ -34,7 +55,7 @@ const QuickActionsSection = ({ onQuickAction }) => {
         <h2 className="text-xl font-bold text-gray-900">Quick Actions</h2>
       </div>
       <div className="card-body">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {quickActions.map((action, index) => (
             <QuickActionCard
               key={index}

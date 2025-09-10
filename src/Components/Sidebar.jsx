@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import './Sidebar.css';
 import { 
   Home, 
   Users, 
@@ -8,94 +9,111 @@ import {
   Calendar, 
   FileText, 
   BarChart3,
-  User,
-  Building2,
   X,
-  CheckCircle,
-  AlertCircle,
-  Monitor
+  Monitor,
+  FilePlus,
+  FileX,
+  LogOut
 } from 'lucide-react';
 
 const Sidebar = ({ sidebarOpen, onClose }) => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   const navigation = [
     { 
       name: 'Dashboard', 
       href: '/', 
-      icon: Home,
-      description: 'Office overview'
+      icon: Home
     },
     { 
       name: 'Employees', 
       href: '/employees', 
-      icon: Users,
-      description: 'Manage team members'
+      icon: Users
     },
     { 
       name: 'Attendance', 
       href: '/attendance', 
-      icon: Clock,
-      description: 'Track attendance'
+      icon: Clock
     },
     { 
       name: 'Leaves', 
       href: '/leaves', 
-      icon: Calendar,
-      description: 'Approve leave requests'
+      icon: Calendar
+    },
+    { 
+      name: 'Resignations', 
+      href: '/resignations', 
+      icon: FileX
     },
     { 
       name: 'Documents', 
       href: '/documents', 
-      icon: FileText,
-      description: 'Office documents'
+      icon: FileText
+    },
+    { 
+      name: 'Generator', 
+      href: '/generator', 
+      icon: FilePlus
     },
     { 
       name: 'Reports', 
       href: '/reports', 
-      icon: BarChart3,
-      description: 'Analytics & reports'
+      icon: BarChart3
     },
     { 
       name: 'Devices', 
       href: '/devices', 
-      icon: Monitor,
-      description: 'Manage biometric devices'
+      icon: Monitor
     },
     { 
       name: 'Profile', 
       href: '/profile', 
-      icon: User,
-      description: 'Your profile'
-    },
+      icon: Users
+    }
+
   ];
+
+  const handleLogout = () => {
+    logout();
+    onClose();
+  };
 
   return (
     <>
       {/* Sidebar */}
-      <div className={`w-72 bg-gradient-to-b from-green-900 via-green-800 to-emerald-900 shadow-2xl border-r-2 border-green-700 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:translate-x-0 lg:block lg:relative lg:inset-0 h-full`}>
-        {/* Logo and close button */}
-        <div className="flex items-center justify-between h-20 px-6 border-b-2 border-green-700">
-          <div className="flex items-center">
-            <div className="h-12 w-12 rounded-2xl bg-gradient-to-r from-white to-green-50 flex items-center justify-center mr-4 shadow-lg border-2 border-green-200">
-              <Building2 className="h-7 w-7 text-green-600" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white">Manager Panel</h1>
-              <p className="text-sm text-green-200">{user?.office?.name || 'Office'}</p>
-            </div>
-          </div>
+      <div className={`fixed lg:relative inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:translate-x-0 flex flex-col h-full`}>
+        
+        {/* Header with Close Button (Mobile) */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 lg:hidden">
+          <h2 className="text-lg font-semibold text-gray-900">Menu</h2>
           <button
             onClick={onClose}
-            className="lg:hidden p-3 rounded-xl text-green-200 hover:text-white hover:bg-gradient-to-r hover:from-green-700 hover:to-emerald-700 transition-all duration-300 shadow-sm"
+            className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
           >
-            <X className="h-6 w-6" />
+            <X className="h-5 w-5" />
           </button>
+        </div>
+
+        {/* User Profile Section */}
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex items-center space-x-3">
+            <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold text-sm">
+              {user?.first_name?.charAt(0) || user?.username?.charAt(0) || 'M'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-900 truncate">
+                {user?.get_full_name?.() || user?.first_name || 'Manager'}
+              </p>
+              <p className="text-xs text-gray-500 truncate">
+                {user?.office?.name || 'Office Manager'}
+              </p>
+            </div>
+          </div>
         </div>
         
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 overflow-y-auto">
-          <div className="space-y-2">
+        <nav className="flex-1 px-4 py-4 overflow-y-auto">
+          <div className="space-y-1">
             {navigation.map((item) => {
               const Icon = item.icon;
               return (
@@ -103,68 +121,38 @@ const Sidebar = ({ sidebarOpen, onClose }) => {
                   key={item.name}
                   to={item.href}
                   className={({ isActive }) =>
-                    `flex items-center px-4 py-4 text-sm font-semibold rounded-xl transition-all duration-300 border-2 border-transparent ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
-                        ? 'bg-gradient-to-r from-white to-green-50 text-green-900 shadow-lg border-green-200'
-                        : 'text-green-100 hover:bg-gradient-to-r hover:from-green-700 hover:to-emerald-700 hover:text-white hover:border-green-600'
+                        ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-600'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`
                   }
                   onClick={onClose}
-                  title={item.description}
                 >
-                  <Icon className={`mr-4 h-6 w-6 ${
-                    window.location.pathname === item.href 
-                      ? 'text-green-900' 
-                      : 'text-green-300 group-hover:text-white'
-                  }`} />
-                  <span className="flex-1">{item.name}</span>
-                  {item.name === 'Leaves' && (
-                    <span className="ml-2 inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-red-100 to-pink-100 text-red-800 border-2 border-red-200">
-                      3
-                    </span>
-                  )}
+                  <Icon className="h-5 w-5 mr-3" />
+                  <span>{item.name}</span>
                 </NavLink>
               );
             })}
           </div>
         </nav>
 
-        {/* User info at bottom */}
-        <div className="p-6 border-t-2 border-green-700">
-          <div className="flex items-center mb-4">
-            <div className="h-12 w-12 rounded-xl bg-gradient-to-r from-green-400 to-blue-500 flex items-center justify-center shadow-lg border-2 border-green-300">
-              <User className="h-6 w-6 text-white" />
-            </div>
-            <div className="ml-4 flex-1">
-              <p className="text-sm font-semibold text-white">
-                {user?.first_name} {user?.last_name}
-              </p>
-              <p className="text-xs text-green-200 capitalize">
-                {user?.role} • {user?.office?.name}
-              </p>
-            </div>
-          </div>
-          
-          {/* Office status */}
-          <div className="p-4 bg-gradient-to-r from-green-800 to-emerald-800 rounded-2xl border-2 border-green-600 shadow-lg">
-            <div className="flex items-center justify-between text-sm mb-2">
-              <span className="text-green-200 font-medium">Office Status</span>
-              <div className="flex items-center">
-                <div className="h-3 w-3 bg-green-400 rounded-full mr-2 animate-pulse shadow-sm"></div>
-                <span className="text-green-400 font-semibold">Active</span>
-              </div>
-            </div>
-            <div className="text-xs text-green-200">
-              <p>Last sync: {new Date().toLocaleTimeString()}</p>
-            </div>
-          </div>
+        {/* Logout Button */}
+        <div className="p-4 border-t border-gray-200">
+          <button
+            onClick={handleLogout}
+            className="flex items-center w-full px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition-colors"
+          >
+            <LogOut className="h-5 w-5 mr-3" />
+            <span>Logout</span>
+          </button>
         </div>
       </div>
 
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"
+          className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
           onClick={onClose}
         />
       )}

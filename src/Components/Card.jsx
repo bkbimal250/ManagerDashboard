@@ -12,10 +12,10 @@ const Card = ({
       {(title || subtitle) && (
         <div className="card-header">
           {title && (
-            <h3 className="text-xl font-bold text-gray-900">{title}</h3>
+            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
           )}
           {subtitle && (
-            <p className="mt-1 text-sm text-gray-600">{subtitle}</p>
+            <p className="mt-1 text-xs text-gray-600">{subtitle}</p>
           )}
         </div>
       )}

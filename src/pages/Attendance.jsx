@@ -10,7 +10,10 @@ import {
   Filter,
   Download,
   Eye,
-  EyeOff
+  EyeOff,
+  AlertTriangle,
+  Timer,
+  CalendarDays
 } from 'lucide-react';
 import { 
   AttendanceOverview,
@@ -33,31 +36,18 @@ const Attendance = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   
-  // Filter states
+  // Filter states - Enhanced with new fields
   const [filters, setFilters] = useState({
     date: new Date().toISOString().split('T')[0],
     employee: '',
     status: '',
+    day_status: '', // New: complete_day, half_day, absent
+    is_late: '', // New: true, false
     office: user?.office?.id || ''
   });
   
   // UI states
   const [showFilters, setShowFilters] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [refreshInterval, setRefreshInterval] = useState(30); // seconds
-
-  // Auto-refresh effect
-  useEffect(() => {
-    let interval;
-    if (autoRefresh && refreshInterval > 0) {
-      interval = setInterval(() => {
-        fetchAttendanceData();
-      }, refreshInterval * 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [autoRefresh, refreshInterval, filters]);
 
   // Initial data fetch
   useEffect(() => {
@@ -74,7 +64,9 @@ const Attendance = () => {
       const todayData = await api.getTodayAttendance({
         office: filters.office,
         employee: filters.employee,
-        status: filters.status
+        status: filters.status,
+        day_status: filters.day_status,
+        is_late: filters.is_late
       });
       setTodayAttendance(todayData.attendance_records || []);
       setAttendanceStats(todayData.statistics || {});
@@ -85,6 +77,8 @@ const Attendance = () => {
         office: filters.office,
         employee: filters.employee,
         status: filters.status,
+        day_status: filters.day_status,
+        is_late: filters.is_late,
         limit: 100
       });
       setAttendanceData(generalData || []);
@@ -110,6 +104,18 @@ const Attendance = () => {
       ...prev,
       [key]: value
     }));
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setFilters({
+      date: new Date().toISOString().split('T')[0],
+      employee: '',
+      status: '',
+      day_status: '',
+      is_late: '',
+      office: user?.office?.id || ''
+    });
   };
 
   // Export attendance data
@@ -146,28 +152,12 @@ const Attendance = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="page-header">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="page-title">Attendance Management</h1>
-            <p className="page-subtitle">
-              Monitor and manage attendance for your office: {user?.office?.name}
-            </p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center text-sm text-gray-600">
-              <Building2 className="h-4 w-4 mr-1" />
-              {user?.office?.name}
-            </div>
-          </div>
-        </div>
-      </div>
+
 
       {/* Controls Bar */}
       <div className="bg-white rounded-lg shadow-sm border p-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* Left side - Refresh and Auto-refresh */}
+          {/* Left side - Refresh */}
           <div className="flex items-center space-x-3">
             <Button
               onClick={handleRefresh}
@@ -177,32 +167,6 @@ const Attendance = () => {
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
               <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
             </Button>
-            
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="autoRefresh"
-                checked={autoRefresh}
-                onChange={(e) => setAutoRefresh(e.target.checked)}
-                className="rounded"
-              />
-              <label htmlFor="autoRefresh" className="text-sm text-gray-600">
-                Auto-refresh
-              </label>
-            </div>
-            
-            {autoRefresh && (
-              <select
-                value={refreshInterval}
-                onChange={(e) => setRefreshInterval(Number(e.target.value))}
-                className="text-sm border rounded px-2 py-1"
-              >
-                <option value={15}>15s</option>
-                <option value={30}>30s</option>
-                <option value={60}>1m</option>
-                <option value={300}>5m</option>
-              </select>
-            )}
           </div>
 
           {/* Right side - Filters, Export, and View Toggle */}
@@ -236,10 +200,10 @@ const Attendance = () => {
           </div>
         </div>
 
-        {/* Filters Panel */}
+        {/* Enhanced Filters Panel */}
         {showFilters && (
           <div className="mt-4 pt-4 border-t">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Date
@@ -282,6 +246,39 @@ const Attendance = () => {
                   <option value="leave">Leave</option>
                 </select>
               </div>
+
+              {/* New Day Status Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Day Status
+                </label>
+                <select
+                  value={filters.day_status}
+                  onChange={(e) => handleFilterChange('day_status', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Day Status</option>
+                  <option value="complete_day">Complete Day</option>
+                  <option value="half_day">Half Day</option>
+                  <option value="absent">Absent</option>
+                </select>
+              </div>
+
+              {/* New Late Coming Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Late Coming
+                </label>
+                <select
+                  value={filters.is_late}
+                  onChange={(e) => handleFilterChange('is_late', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All</option>
+                  <option value="true">Late</option>
+                  <option value="false">On Time</option>
+                </select>
+              </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -296,6 +293,18 @@ const Attendance = () => {
                   <option value={user?.office?.id}>{user?.office?.name}</option>
                 </select>
               </div>
+            </div>
+
+            {/* Filter Actions */}
+            <div className="mt-4 flex justify-end">
+              <Button
+                onClick={clearFilters}
+                variant="outline"
+                size="sm"
+                className="mr-2"
+              >
+                Clear Filters
+              </Button>
             </div>
           </div>
         )}
@@ -356,9 +365,9 @@ const Attendance = () => {
             />
           ) : (
             <EmployeeAttendanceView 
-              employee={selectedEmployee} 
+              selectedEmployee={selectedEmployee} 
               onBack={handleBackToOverview}
-              attendanceData={attendanceData.filter(att => att.user?.id === selectedEmployee?.id)}
+              officeId={user?.office?.id}
             />
           )}
         </>

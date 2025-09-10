@@ -12,18 +12,18 @@ const OfficeInfoCard = ({ office, manager }) => {
       </div>
       <div className="card-body">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div>
+          {/* <div>
             <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
               <Building2 className="h-5 w-5 mr-2 text-blue-600" />
               Office Details
             </h3>
             <div className="space-y-3 text-sm text-gray-600">
               <p><strong>Name:</strong> {office.name}</p>
-              <p><strong>Address:</strong> {office.address || 'Not specified'}</p>
-              <p><strong>Email:</strong> {office.email || 'Not specified'}</p>
-              <p><strong>Phone:</strong> {office.phone || 'Not specified'}</p>
+              <p><strong>Address:</strong> {office.address}</p>
+              <p><strong>Email:</strong> {office.email}</p>
+              <p><strong>Phone:</strong> {office.phone}</p>
             </div>
-          </div>
+          </div> */}
           <div>
             <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
               <Users className="h-5 w-5 mr-2 text-green-600" />

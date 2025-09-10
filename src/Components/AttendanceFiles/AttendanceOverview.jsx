@@ -2,15 +2,17 @@ import React, { useState, useMemo } from 'react';
 import { 
   Users, 
   Clock, 
-  Calendar, 
   TrendingUp, 
   TrendingDown,
   CheckCircle,
   XCircle,
-  AlertCircle,
   User,
   Search,
-  Filter
+  Filter,
+  AlertTriangle,
+  Timer,
+  CalendarDays,
+  Eye
 } from 'lucide-react';
 import { Button } from '../index';
 
@@ -24,26 +26,32 @@ const AttendanceOverview = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [dayStatusFilter, setDayStatusFilter] = useState('');
+  const [lateFilter, setLateFilter] = useState('');
 
-  // Calculate statistics
+  // Calculate enhanced statistics
   const stats = useMemo(() => {
     const total = todayAttendance.length;
     const present = todayAttendance.filter(att => att.status === 'present').length;
     const absent = total - present; // Correct calculation: Total - Present = Absent
-    const late = todayAttendance.filter(att => att.status === 'late').length;
-    const onLeave = todayAttendance.filter(att => att.status === 'leave').length;
+    
+    // New statistics for enhanced attendance system
+    const completeDays = todayAttendance.filter(att => att.day_status === 'complete_day').length;
+    const halfDays = todayAttendance.filter(att => att.day_status === 'half_day').length;
+    const lateComing = todayAttendance.filter(att => att.is_late === true).length;
     
     return {
       total,
       present,
       absent,
-      late,
-      onLeave,
+      completeDays,
+      halfDays,
+      lateComing,
       attendanceRate: total > 0 ? Math.round((present / total) * 100) : 0
     };
   }, [todayAttendance]);
 
-  // Filter attendance data
+  // Enhanced filtering
   const filteredData = useMemo(() => {
     let filtered = attendanceData;
 
@@ -61,8 +69,19 @@ const AttendanceOverview = ({
       filtered = filtered.filter(att => att.status === statusFilter);
     }
 
+    // Apply day status filter
+    if (dayStatusFilter) {
+      filtered = filtered.filter(att => att.day_status === dayStatusFilter);
+    }
+
+    // Apply late filter
+    if (lateFilter !== '') {
+      const isLate = lateFilter === 'true';
+      filtered = filtered.filter(att => att.is_late === isLate);
+    }
+
     return filtered;
-  }, [attendanceData, searchTerm, statusFilter]);
+  }, [attendanceData, searchTerm, statusFilter, dayStatusFilter, lateFilter]);
 
   // Get status icon and color
   const getStatusInfo = (status) => {
@@ -71,12 +90,6 @@ const AttendanceOverview = ({
         return { icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-100' };
       case 'absent':
         return { icon: XCircle, color: 'text-red-600', bgColor: 'bg-red-100' };
-      case 'late':
-        return { icon: AlertCircle, color: 'text-yellow-600', bgColor: 'bg-yellow-100' };
-      case 'leave':
-        return { icon: Calendar, color: 'text-blue-600', bgColor: 'bg-blue-100' };
-      case 'half_day':
-        return { icon: Clock, color: 'text-orange-600', bgColor: 'bg-orange-100' };
       default:
         return { icon: User, color: 'text-gray-600', bgColor: 'bg-gray-100' };
     }
@@ -103,10 +116,18 @@ const AttendanceOverview = ({
     });
   };
 
+  // Clear all filters
+  const clearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('');
+    setDayStatusFilter('');
+    setLateFilter('');
+  };
+
   return (
     <div className="space-y-6">
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      {/* Enhanced Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Employees */}
         <div className="bg-white rounded-lg shadow-sm border p-4">
           <div className="flex items-center justify-between">
@@ -133,6 +154,51 @@ const AttendanceOverview = ({
           </div>
         </div>
 
+        {/* Complete Days */}
+        <div className="bg-white rounded-lg shadow-sm border p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Complete Days</p>
+              <p className="text-2xl font-bold text-green-600">{stats.completeDays}</p>
+              <p className="text-xs text-gray-500">≥ 5 hours</p>
+            </div>
+            <div className="p-2 bg-green-100 rounded-lg">
+              <CalendarDays className="h-6 w-6 text-green-600" />
+            </div>
+          </div>
+        </div>
+
+        {/* Half Days */}
+        <div className="bg-white rounded-lg shadow-sm border p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Half Days</p>
+              <p className="text-2xl font-bold text-yellow-600">{stats.halfDays}</p>
+              <p className="text-xs text-gray-500">≥ 5 hours</p>
+            </div>
+            <div className="p-2 bg-yellow-100 rounded-lg">
+              <Timer className="h-6 w-6 text-yellow-600" />
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Additional Statistics Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Late Coming */}
+        <div className="bg-white rounded-lg shadow-sm border p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Late Coming</p>
+              <p className="text-2xl font-bold text-orange-600">{stats.lateComing}</p>
+            </div>
+            <div className="p-2 bg-orange-100 rounded-lg">
+              <AlertTriangle className="h-6 w-6 text-orange-600" />
+            </div>
+          </div>
+        </div>
+
         {/* Absent */}
         <div className="bg-white rounded-lg shadow-sm border p-4">
           <div className="flex items-center justify-between">
@@ -146,18 +212,7 @@ const AttendanceOverview = ({
           </div>
         </div>
 
-        {/* Late */}
-        <div className="bg-white rounded-lg shadow-sm border p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Late</p>
-              <p className="text-2xl font-bold text-yellow-600">{stats.late}</p>
-            </div>
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <AlertCircle className="h-6 w-6 text-yellow-600" />
-            </div>
-          </div>
-        </div>
+
 
         {/* Attendance Rate */}
         <div className="bg-white rounded-lg shadow-sm border p-4">
@@ -173,7 +228,7 @@ const AttendanceOverview = ({
         </div>
       </div>
 
-      {/* Filters and Search */}
+      {/* Enhanced Filters and Search */}
       <div className="bg-white rounded-lg shadow-sm border p-4">
         <div className="flex flex-col md:flex-row gap-4">
           {/* Search */}
@@ -200,146 +255,177 @@ const AttendanceOverview = ({
               <option value="">All Status</option>
               <option value="present">Present</option>
               <option value="absent">Absent</option>
-              <option value="late">Late</option>
-              <option value="half_day">Half Day</option>
-              <option value="leave">Leave</option>
             </select>
+          </div>
+
+          {/* Day Status Filter */}
+          <div className="md:w-48">
+            <select
+              value={dayStatusFilter}
+              onChange={(e) => setDayStatusFilter(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Day Status</option>
+              <option value="complete_day">Complete Day</option>
+              <option value="half_day">Half Day</option>
+              <option value="absent">Absent</option>
+            </select>
+          </div>
+
+          {/* Late Coming Filter */}
+          <div className="md:w-48">
+            <select
+              value={lateFilter}
+              onChange={(e) => setLateFilter(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All</option>
+              <option value="true">Late</option>
+              <option value="false">On Time</option>
+            </select>
+          </div>
+
+          {/* Clear Filters Button */}
+          <div className="md:w-auto">
+            <Button
+              onClick={clearFilters}
+              variant="outline"
+              size="sm"
+              className="w-full md:w-auto"
+            >
+              Clear Filters
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* Attendance Table */}
-      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+      {/* Attendance Records Table */}
+      <div className="bg-white rounded-lg shadow-sm border">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Today's Attendance</h3>
-          <p className="text-sm text-gray-600">
-            {formatDate(new Date().toISOString())} • {filteredData.length} records
+          <h3 className="text-lg font-medium text-gray-900">Today's Attendance Records</h3>
+          <p className="text-sm text-gray-500">
+            Showing {filteredData.length} of {todayAttendance.length} records
           </p>
         </div>
-
+        
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Employee
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Check In
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Check Out
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total Hours
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check In</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check Out</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Day Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Late Coming</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredData.length === 0 ? (
-                <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
-                    <Users className="mx-auto h-12 w-12 text-gray-400" />
-                    <p className="mt-2 text-sm">No attendance records found</p>
-                    <p className="text-xs">Try adjusting your filters or search terms</p>
-                  </td>
-                </tr>
-              ) : (
-                filteredData.map((attendance) => {
-                  const statusInfo = getStatusInfo(attendance.status);
-                  const StatusIcon = statusInfo.icon;
-
-                  return (
-                    <tr key={attendance.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10">
-                            <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
-                              <User className="h-6 w-6 text-gray-600" />
-                            </div>
+              {filteredData.map((record) => {
+                const statusInfo = getStatusInfo(record.status);
+                const StatusIcon = statusInfo.icon;
+                
+                return (
+                  <tr key={record.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                          <User className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {record.user?.first_name} {record.user?.last_name}
                           </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">
-                              {attendance.user?.first_name} {attendance.user?.last_name}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {attendance.user?.employee_id}
-                            </div>
+                          <div className="text-sm text-gray-500">
+                            ID: {record.user?.employee_id}
                           </div>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className={`p-2 rounded-full ${statusInfo.bgColor}`}>
-                            <StatusIcon className={`h-4 w-4 ${statusInfo.color}`} />
-                          </div>
-                          <span className={`ml-2 text-sm font-medium capitalize ${statusInfo.color}`}>
-                            {attendance.status?.replace('_', ' ')}
-                          </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatDate(record.date)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {record.check_in_time ? (
+                        <span className="text-green-600 font-medium">{formatTime(record.check_in_time)}</span>
+                      ) : (
+                        <span className="text-red-500">Not checked in</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {record.check_out_time ? (
+                        <span className="text-blue-600 font-medium">{formatTime(record.check_out_time)}</span>
+                      ) : (
+                        <span className="text-gray-500">Not checked out</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <StatusIcon className={`h-4 w-4 mr-2 ${statusInfo.color}`} />
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusInfo.bgColor} ${statusInfo.color}`}>
+                          {record.status}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        record.day_status === 'complete_day' ? 'bg-green-100 text-green-800' :
+                        record.day_status === 'half_day' ? 'bg-yellow-100 text-yellow-800' :
+                        record.day_status === 'absent' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {record.day_status ? record.day_status.replace('_', ' ').toUpperCase() : 'N/A'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                          record.is_late ? 'bg-orange-100' : 'bg-gray-100'
+                        }`}>
+                          {record.is_late ? (
+                            <AlertTriangle className="w-3 h-3 text-orange-600" />
+                          ) : (
+                            <CheckCircle className="w-3 h-3 text-gray-600" />
+                          )}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatTime(attendance.check_in_time)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatTime(attendance.check_out_time)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {attendance.total_hours ? `${attendance.total_hours}h` : '--'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <Button
-                          onClick={() => onViewEmployee(attendance.user)}
-                          variant="outline"
-                          size="sm"
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          View Details
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          record.is_late ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {record.is_late ? 'Late' : 'On Time'}
+                        </span>
+                        {record.is_late && record.late_minutes && (
+                          <div className="text-xs text-orange-600">
+                            {record.late_minutes} min
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <Button
+                        onClick={() => onViewEmployee(record.user)}
+                        size="sm"
+                        variant="outline"
+                        className="flex items-center"
+                      >
+                        <Eye className="h-3 w-3 mr-1" />
+                        View
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
-      </div>
 
-      {/* Recent Activity */}
-      <div className="bg-white rounded-lg shadow-sm border p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Activity</h3>
-        <div className="space-y-3">
-          {attendanceData.slice(0, 5).map((attendance) => {
-            const statusInfo = getStatusInfo(attendance.status);
-            const StatusIcon = statusInfo.icon;
-
-            return (
-              <div key={attendance.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                <div className={`p-2 rounded-full ${statusInfo.bgColor}`}>
-                  <StatusIcon className={`h-4 w-4 ${statusInfo.color}`} />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">
-                    {attendance.user?.first_name} {attendance.user?.last_name}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {formatDate(attendance.date)} • {formatTime(attendance.check_in_time)}
-                  </p>
-                </div>
-                <span className={`text-xs font-medium capitalize ${statusInfo.color}`}>
-                  {attendance.status?.replace('_', ' ')}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+        {filteredData.length === 0 && (
+          <div className="text-center py-8">
+            <User className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-500">No attendance records found</p>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import Header from './Header';
 import Sidebar from './Sidebar';
 import Footer from './Footer';
+import Header from './Header';
 
 const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -16,7 +16,7 @@ const Layout = () => {
   };
 
   return (
-    <div className="h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex overflow-hidden">
+    <div className="h-screen bg-gray-50 flex overflow-hidden">
       {/* Sidebar */}
       <Sidebar sidebarOpen={sidebarOpen} onClose={handleSidebarClose} />
 
@@ -26,8 +26,8 @@ const Layout = () => {
         <Header onMenuClick={handleMenuClick} sidebarOpen={sidebarOpen} />
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-gray-50 to-gray-100">
-          <div className="h-full p-8">
+        <main className="flex-1 overflow-y-auto bg-gray-50">
+          <div className="h-full p-3 lg:p-6">
             <div className="animate-fade-in">
               <Outlet />
             </div>

@@ -1,6 +1,7 @@
 export { default as Button } from './Button';
 export { default as Input } from './Input';
 export { default as Card } from './Card';
+export { default as Select } from './Select';
 export { default as LoadingSpinner } from './LoadingSpinner';
 export { default as Layout } from './Layout';
 export { default as Header } from './Header';
@@ -22,3 +23,11 @@ export * from './DashboardFiles';
 
 // Device Components
 export * from './DevicesFiles';
+
+// Profile Components
+export * from './ProfileFiles';
+
+// WebSocket Components
+export { default as WebSocketStatus } from './WebSocketStatus/WebSocketStatus';
+export { default as RealTimeNotification } from './RealTimeNotification/RealTimeNotification';
+export { default as RealTimeAttendance } from './RealTimeAttendance/RealTimeAttendance';

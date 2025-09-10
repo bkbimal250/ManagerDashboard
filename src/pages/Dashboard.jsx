@@ -4,7 +4,8 @@ import {
   StatsGrid,
   QuickActionsSection,
   RecentActivitySection,
-  OfficeInfoCard
+  OfficeInfoCard,
+  OfficeOverviewCard
 } from '../Components/DashboardFiles';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -29,7 +30,7 @@ const Dashboard = () => {
       
       // Use manager-specific API calls to get office-specific data
       const [statsData, attendanceData, leavesData] = await Promise.all([
-        api.getDashboardStats(), // Get dashboard stats (automatically filtered by user role/office)
+        api.getManagerDashboardStats(), // Get manager-specific dashboard stats
         api.getManagerAttendance({ limit: 5 }), // Get manager's office attendance
         api.getManagerLeaves({ status: 'pending', limit: 5 }) // Get manager's office leaves
       ]);
@@ -44,7 +45,8 @@ const Dashboard = () => {
         total_employees: 0,
         today_attendance: 0,
         pending_leaves: 0,
-        active_users: 0
+        active_employees: 0,
+        office_name: 'Unknown Office'
       });
       setRecentAttendance([]);
       setPendingLeaves([]);
@@ -78,6 +80,7 @@ const Dashboard = () => {
     }
   };
 
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -87,7 +90,7 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-4 animate-fade-in">
       {/* Dashboard Header */}
       <DashboardHeader
         user={user}
@@ -108,10 +111,16 @@ const Dashboard = () => {
         pendingLeaves={pendingLeaves}
       />
 
+      {/* Office Overview Card */}
+      {user?.office && (
+        <OfficeOverviewCard office={user.office} stats={stats} />
+      )}
+
       {/* Office Information */}
       {user?.office && (
         <OfficeInfoCard office={user.office} manager={user} />
       )}
+      
     </div>
   );
 };
