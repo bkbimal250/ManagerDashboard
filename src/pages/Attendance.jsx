@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Button } from '../Components';
 import { 
   Clock, 
@@ -25,6 +26,7 @@ import api from '../services/api';
 
 const Attendance = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const [viewMode, setViewMode] = useState('overview'); // overview, employee, checkin_checkout
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   
@@ -53,6 +55,17 @@ const Attendance = () => {
   useEffect(() => {
     fetchAttendanceData();
   }, [filters]);
+
+  // Handle navigation state from other pages
+  useEffect(() => {
+    if (location.state) {
+      const { selectedEmployee: navEmployee, viewMode: navViewMode } = location.state;
+      if (navEmployee) {
+        setSelectedEmployee(navEmployee);
+        setViewMode(navViewMode || 'employee');
+      }
+    }
+  }, [location.state]);
 
   // Fetch attendance data
   const fetchAttendanceData = useCallback(async () => {

@@ -50,12 +50,12 @@ const QuickActionsSection = ({ onQuickAction }) => {
   ];
 
   return (
-    <Card className="shadow-lg border-2 border-gray-100">
-      <div className="card-header">
-        <h2 className="text-xl font-bold text-gray-900">Quick Actions</h2>
+    <Card className="shadow-lg border border-gray-200">
+      <div className="p-4 border-b border-gray-200">
+        <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
       </div>
-      <div className="card-body">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="p-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {quickActions.map((action, index) => (
             <QuickActionCard
               key={index}

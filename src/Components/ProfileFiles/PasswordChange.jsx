@@ -28,7 +28,7 @@ const PasswordField = ({ label, name, value, show, onChange, toggle }) => (
 
 const PasswordChange = () => {
   const [show, setShow] = useState({ current: false, new: false, confirm: false });
-  const [data, setData] = useState({ current_password: '', new_password: '', confirm_password: '' });
+  const [data, setData] = useState({ old_password: '', new_password: '', confirm_password: '' });
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState({ type: '', text: '' });
 
@@ -37,17 +37,28 @@ const PasswordChange = () => {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    if (data.new_password !== data.confirm_password) return setMsg({ type: 'error', text: 'Passwords do not match' });
+    
+    // Validation
+    if (!data.old_password) return setMsg({ type: 'error', text: 'Current password is required' });
+    if (!data.new_password) return setMsg({ type: 'error', text: 'New password is required' });
+    if (!data.confirm_password) return setMsg({ type: 'error', text: 'Confirm password is required' });
+    if (data.new_password !== data.confirm_password) return setMsg({ type: 'error', text: 'New passwords do not match' });
     if (data.new_password.length < 8) return setMsg({ type: 'error', text: 'Password must be at least 8 characters' });
+    if (data.old_password === data.new_password) return setMsg({ type: 'error', text: 'New password must be different from current password' });
 
     try {
       setLoading(true);
       setMsg({ type: '', text: '' });
-      await api.changePassword({ current_password: data.current_password, new_password: data.new_password });
+      await api.changePassword({ old_password: data.old_password, new_password: data.new_password, confirm_password: data.confirm_password });
       setMsg({ type: 'success', text: 'Password changed successfully!' });
-      setData({ current_password: '', new_password: '', confirm_password: '' });
+      setData({ old_password: '', new_password: '', confirm_password: '' });
     } catch (err) {
-      setMsg({ type: 'error', text: err.response?.data?.detail || 'Failed to change password' });
+      console.error('Password change error:', err);
+      const errorMessage = err.response?.data?.error || 
+                          err.response?.data?.detail || 
+                          err.response?.data?.message ||
+                          'Failed to change password';
+      setMsg({ type: 'error', text: errorMessage });
     } finally {
       setLoading(false);
     }
@@ -74,8 +85,8 @@ const PasswordChange = () => {
       <form onSubmit={handleSubmit} className="space-y-4">
         <PasswordField
           label="Current Password"
-          name="current_password"
-          value={data.current_password}
+          name="old_password"
+          value={data.old_password}
           show={show.current}
           onChange={handleChange}
           toggle={() => toggle('current')}

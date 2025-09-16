@@ -53,34 +53,18 @@ const StatsGrid = ({ stats }) => {
   ];
 
   return (
-    <div className="space-y-3">
-      {/* Main Stats Grid */}
-      <div className="stats-grid">
-        {statsData.map((stat, index) => (
-          <StatsCard
-            key={index}
-            title={stat.title}
-            value={stat.value}
-            subtitle={stat.subtitle}
-            icon={stat.icon}
-            color={stat.color}
-          />
-        ))}
-      </div>
-      
-      {/* Additional Manager Stats */}
-      <div className="stats-grid">
-        {additionalStats.map((stat, index) => (
-          <StatsCard
-            key={index}
-            title={stat.title}
-            value={stat.value}
-            subtitle={stat.subtitle}
-            icon={stat.icon}
-            color={stat.color}
-          />
-        ))}
-      </div>
+    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+      {/* All Stats in One Grid */}
+      {[...statsData, ...additionalStats].map((stat, index) => (
+        <StatsCard
+          key={index}
+          title={stat.title}
+          value={stat.value}
+          subtitle={stat.subtitle}
+          icon={stat.icon}
+          color={stat.color}
+        />
+      ))}
     </div>
   );
 };

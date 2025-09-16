@@ -15,7 +15,6 @@ const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
-  const [recentAttendance, setRecentAttendance] = useState([]);
   const [pendingLeaves, setPendingLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -29,14 +28,12 @@ const Dashboard = () => {
       setLoading(true);
       
       // Use manager-specific API calls to get office-specific data
-      const [statsData, attendanceData, leavesData] = await Promise.all([
+      const [statsData, leavesData] = await Promise.all([
         api.getManagerDashboardStats(), // Get manager-specific dashboard stats
-        api.getManagerAttendance({ limit: 5 }), // Get manager's office attendance
         api.getManagerLeaves({ status: 'pending', limit: 5 }) // Get manager's office leaves
       ]);
 
       setStats(statsData);
-      setRecentAttendance(attendanceData.results || attendanceData);
       setPendingLeaves(leavesData.results || leavesData);
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
@@ -48,7 +45,6 @@ const Dashboard = () => {
         active_employees: 0,
         office_name: 'Unknown Office'
       });
-      setRecentAttendance([]);
       setPendingLeaves([]);
     } finally {
       setLoading(false);
@@ -75,7 +71,14 @@ const Dashboard = () => {
       case 'reports':
         navigate('/reports');
         break;
+      case 'documents':
+        navigate('/documents');
+        break;
+      case 'settings':
+        navigate('/profile');
+        break;
       default:
+        console.warn('Unknown quick action:', action);
         break;
     }
   };
@@ -90,13 +93,14 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-4 animate-fade-in">
+    <div className="space-y-3 animate-fade-in">
       {/* Dashboard Header */}
       <DashboardHeader
         user={user}
         onRefresh={handleRefresh}
         refreshing={refreshing}
         onViewReports={() => handleQuickAction('reports')}
+        onQuickAction={handleQuickAction}
       />
 
       {/* Stats Grid */}
@@ -105,18 +109,31 @@ const Dashboard = () => {
       {/* Quick Actions Section */}
       <QuickActionsSection onQuickAction={handleQuickAction} />
 
-      {/* Recent Activity Section */}
-      <RecentActivitySection
-        recentAttendance={recentAttendance}
-        pendingLeaves={pendingLeaves}
-      />
+      {/* Office Overview and Pending Leaves Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        {/* Office Overview Card */}
+        {user?.office && (
+          <OfficeOverviewCard office={user.office} stats={stats} />
+        )}
 
-      {/* Office Overview Card */}
-      {user?.office && (
-        <OfficeOverviewCard office={user.office} stats={stats} />
-      )}
+        {/* Pending Leave Requests */}
+        <RecentActivitySection
+          pendingLeaves={pendingLeaves}
+          onViewLeaves={(leave) => {
+            if (leave) {
+              navigate('/leaves', { 
+                state: { 
+                  selectedLeave: leave
+                } 
+              });
+            } else {
+              navigate('/leaves');
+            }
+          }}
+        />
+      </div>
 
-      {/* Office Information */}
+      {/* Manager Information */}
       {user?.office && (
         <OfficeInfoCard office={user.office} manager={user} />
       )}

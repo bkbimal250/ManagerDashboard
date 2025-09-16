@@ -259,9 +259,9 @@ const DocumentTable = ({
                           <div className="text-sm text-gray-500">
                             {document.user?.employee_id || 'Employee ID: Not assigned'}
                           </div>
-                          {document.user?.department && (
+                          {document.user?.department_name && (
                             <div className="text-xs text-gray-400">
-                              {document.user.department}
+                              {document.user.department_name}
                             </div>
                           )}
                         </div>

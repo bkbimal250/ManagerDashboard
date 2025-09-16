@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL ='https://company.d0s369.co.in/api';
+const API_BASE_URL = 'https://company.d0s369.co.in/api';
 // const API_BASE_URL = 'http://localhost:8000/api';
 
 class ApiService {
@@ -20,25 +20,25 @@ class ApiService {
     });
 
     // Request interceptor to add auth token
-   this.api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+    this.api.interceptors.request.use(
+      (config) => {
+        const token = localStorage.getItem('access_token');
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
 
-    // ✅ Ensure trailing slash for GET requests
-    if (config.method === 'get' && config.url && !config.url.endsWith('/')) {
-      config.url += '/';
-    }
+        // ✅ Ensure trailing slash for GET requests
+        if (config.method === 'get' && config.url && !config.url.endsWith('/')) {
+          config.url += '/';
+        }
 
-    // Note: CORS headers are set by the server, not the client
-    // The server should handle CORS configuration
+        // Note: CORS headers are set by the server, not the client
+        // The server should handle CORS configuration
 
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
 
     // Response interceptor to handle token refresh - IMPROVED
     this.api.interceptors.response.use(
@@ -47,12 +47,12 @@ class ApiService {
       },
       async (error) => {
         const originalRequest = error.config;
-        
-        
+
+
         // Only attempt token refresh for 401 errors and if we haven't already tried
         if (error.response?.status === 401 && !originalRequest._retry) {
           originalRequest._retry = true;
-          
+
           try {
             const refreshToken = localStorage.getItem('refresh_token');
             if (refreshToken) {
@@ -60,7 +60,7 @@ class ApiService {
               const response = await axios.post(`${API_BASE_URL}/token/refresh/`, {
                 refresh: refreshToken,
               });
-              
+
               if (response.data.access) {
                 localStorage.setItem('access_token', response.data.access);
                 originalRequest.headers.Authorization = `Bearer ${response.data.access}`;
@@ -77,7 +77,7 @@ class ApiService {
             }
           }
         }
-        
+
         return Promise.reject(error);
       }
     );
@@ -86,22 +86,22 @@ class ApiService {
   // Authentication methods
   async login(credentials) {
     try {
-      
+
       // Add dashboard_type parameter that backend expects
       const loginData = {
         ...credentials,
         dashboard_type: 'manager' // Manager dashboard type
       };
-      
+
       const response = await this.api.post('/auth/login/', loginData);
-      
+
       const { access, refresh, user } = response.data;
-      
+
       if (!access || !refresh) {
         throw new Error('Invalid response from server');
       }
-      
-      
+
+
       return {
         success: true,
         access,
@@ -155,9 +155,9 @@ class ApiService {
   async changePassword(passwordData) {
     try {
       const response = await this.api.post('/auth/change-password/', passwordData);
-      return { success: true };
+      return response.data;
     } catch (error) {
-      return { success: false, error: this.handleError(error).message };
+      throw error; // Let the component handle the error
     }
   }
 
@@ -190,33 +190,33 @@ class ApiService {
 
   async getManagerEmployees(params = {}) {
     // Get employees from the manager's office
-    const response = await this.api.get('/dashboard/manager_employees/', { 
-      params: { 
+    const response = await this.api.get('/dashboard/manager_employees/', {
+      params: {
         ...params,
         role: 'employee'
-      } 
+      }
     });
     return response.data;
   }
 
   async getManagerAttendance(params = {}) {
     // Get attendance data for manager's office
-    const response = await this.api.get('/dashboard/manager_attendance/', { 
-      params: { 
+    const response = await this.api.get('/dashboard/manager_attendance/', {
+      params: {
         ...params,
         limit: params.limit || 10
-      } 
+      }
     });
     return response.data;
   }
 
   async getManagerLeaves(params = {}) {
     // Get leaves data for manager's office
-    const response = await this.api.get('/dashboard/manager_leaves/', { 
-      params: { 
+    const response = await this.api.get('/dashboard/manager_leaves/', {
+      params: {
         ...params,
         limit: params.limit || 10
-      } 
+      }
     });
     return response.data;
   }
@@ -246,8 +246,24 @@ class ApiService {
   }
 
   async deleteEmployee(id) {
-    const response = await this.api.delete(`/users/${id}/`);
-    return response.data;
+    try {
+      // Try the standard users endpoint first
+      const response = await this.api.delete(`/users/${id}/`);
+      return response.data;
+    } catch (error) {
+      // If delete fails, try to deactivate the employee instead
+      if (error.response?.status === 404 || error.response?.status === 405) {
+        try {
+          // Deactivate employee instead of deleting
+          const response = await this.api.patch(`/users/${id}/`, { is_active: false });
+          return { ...response.data, deactivated: true };
+        } catch (deactivateError) {
+          // If both fail, throw the original error
+          throw error;
+        }
+      }
+      throw error;
+    }
   }
 
   // Attendance endpoints (office-specific)
@@ -273,12 +289,12 @@ class ApiService {
   }
 
   async getMonthlyAttendance(month, year, params = {}) {
-    const response = await this.api.get('/attendance/monthly/', { 
-      params: { 
-        month, 
-        year, 
-        ...params 
-      } 
+    const response = await this.api.get('/attendance/monthly/', {
+      params: {
+        month,
+        year,
+        ...params
+      }
     });
     return response.data;
   }
@@ -288,7 +304,7 @@ class ApiService {
     const startDateObj = new Date(startDate);
     const year = startDateObj.getFullYear();
     const month = startDateObj.getMonth() + 1; // getMonth() returns 0-11
-    
+
     const response = await this.api.get('/attendance/monthly_attendance/', {
       params: {
         user: employeeId,
@@ -301,12 +317,12 @@ class ApiService {
   }
 
   async getAttendanceReport(startDate, endDate, params = {}) {
-    const response = await this.api.get('/attendance/report/', { 
-      params: { 
+    const response = await this.api.get('/attendance/report/', {
+      params: {
         start_date: startDate,
         end_date: endDate,
-        ...params 
-      } 
+        ...params
+      }
     });
     return response.data;
   }
@@ -551,9 +567,9 @@ class ApiService {
       'leave': 'leave',
       'employee': 'user'
     };
-    
+
     const backendMethod = methodMap[reportType] || reportType;
-    const response = await this.api.get(`/reports/${backendMethod}/export/`, { 
+    const response = await this.api.get(`/reports/${backendMethod}/export/`, {
       params,
       responseType: 'blob'
     });
@@ -612,8 +628,8 @@ class ApiService {
       // Get monthly attendance data for a specific employee with all days including absent days
       // Extract year and month from startDate (format: YYYY-MM-DD)
       const [year, month] = startDate.split('-').map(Number);
-      
-      
+
+
       const response = await this.api.get('/attendance/monthly_attendance/', {
         params: {
           user: employeeId,
@@ -623,17 +639,15 @@ class ApiService {
         }
       });
       
-      // console.log('✅ API response received:', response.data);
       return response.data;
     } catch (error) {
-      // console.error('❌ Error fetching employee attendance:', error);
       throw error;
     }
   }
 
   async updateAttendanceStatus(userId, date, status, dayStatus = null, notes = '') {
     try {
-      
+
       const response = await this.api.post('/attendance/update_status/', {
         user_id: userId,
         date: date,
@@ -641,15 +655,13 @@ class ApiService {
         day_status: dayStatus,
         notes: notes
       });
-      
-      // console.log('✅ API Service: Attendance status updated successfully:', response.data);
-      
+
+
       return {
         success: true,
         data: response.data
       };
     } catch (error) {
-      // console.error('❌ API Service: Failed to update attendance status:', error);
       return {
         success: false,
         error: this.handleError(error).message
@@ -662,9 +674,17 @@ class ApiService {
     if (error.response) {
       // Server responded with error status
       const { status, data } = error.response;
-      // console.error('API Error Response:', { status, data });
-      
-      if (status === 401) {
+
+      if (status === 400) {
+        // Check if it's a login error
+        if (data && (data.detail === 'No active account found with the given credentials' || 
+                     data.detail === 'Invalid credentials' ||
+                     data.message === 'Invalid credentials' ||
+                     data.error === 'Invalid credentials')) {
+          return { message: 'Invalid username or password. Please check your credentials.' };
+        }
+        return { message: data?.detail || data?.message || 'Bad request. Please check your input.' };
+      } else if (status === 401) {
         return { message: 'Authentication failed. Please login again.' };
       } else if (status === 403) {
         return { message: 'You do not have permission to perform this action.' };
@@ -681,11 +701,9 @@ class ApiService {
       }
     } else if (error.request) {
       // Request was made but no response received
-      // console.error('API No Response:', error.request);
       return { message: 'No response from server. Please check your connection.' };
     } else {
       // Something else happened
-      // console.error('API Error:', error.message);
       return { message: error.message || 'An unexpected error occurred.' };
     }
   }
@@ -693,23 +711,19 @@ class ApiService {
   // Test API connection method
   async testConnection() {
     try {
-      // console.log('🔍 Testing API connection...');
-      // console.log('🔍 API Base URL:', API_BASE_URL);
-      
-      // Test with a simple GET request
       const response = await this.api.get('/auth/profile/', {
         timeout: 10000, // Shorter timeout for testing
         validateStatus: () => true, // Accept any status for testing
       });
-      
-      
+
+
       return {
         success: true,
         status: response.status,
         message: 'API connection successful'
       };
     } catch (error) {
-      
+
       return {
         success: false,
         error: error.code || 'UNKNOWN',
@@ -738,36 +752,51 @@ class ApiService {
   // Document Generation API Methods
   async getEmployeesForDocumentGeneration() {
     try {
-      // console.log('📄 API Service: Fetching employees for document generation...');
-      const response = await this.api.get('/document-generation/get_employees/');
-      // console.log('✅ API Service: Employees fetched successfully:', response.data);
+      const response = await this.api.get('/document-generation/employees/');
+
       return response.data;
     } catch (error) {
-      // console.error('❌ API Service: Failed to fetch employees:', error);
-      throw error;
+      console.error('❌ API Service: Error details:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          baseURL: error.config?.baseURL
+        }
+      });
+
+      if (error.response?.status === 403) {
+        throw new Error('Access denied. You do not have permission to view employees.');
+      } else if (error.response?.status === 400) {
+        throw new Error(error.response.data?.error || 'Bad request. Please check your account settings.');
+      } else if (error.response?.status === 500) {
+        throw new Error('Server error occurred while fetching employees. Please try again.');
+      } else if (error.response?.data?.error) {
+        throw new Error(error.response.data.error);
+      } else {
+        throw new Error(`Failed to fetch employees: ${error.message}`);
+      }
     }
   }
 
+
   async generateDocument(documentData) {
     try {
-      // console.log('📄 API Service: Generating document...', documentData);
       const response = await this.api.post('/document-generation/generate_document/', documentData);
-      // console.log('✅ API Service: Document generated successfully:', response.data);
       return response.data;
     } catch (error) {
-      // console.error('❌ API Service: Failed to generate document:', error);
       throw error;
     }
   }
 
   async getGeneratedDocuments(params = {}) {
     try {
-      // console.log('📄 API Service: Fetching generated documents...');
       const response = await this.api.get('/generated-documents/', { params });
-      // console.log('✅ API Service: Generated documents fetched successfully:', response.data);
       return response.data;
     } catch (error) {
-      // console.error('❌ API Service: Failed to fetch generated documents:', error);
       throw error;
     }
   }
@@ -775,7 +804,7 @@ class ApiService {
   async downloadDocumentPDF(documentId) {
     try {
       console.log('📄 API Service: Downloading document PDF...', documentId);
-      
+
       const response = await this.api.get(`/generated-documents/${documentId}/download_pdf/`, {
         responseType: 'blob',
         timeout: 60000, // 60 seconds timeout for PDF generation
@@ -783,12 +812,12 @@ class ApiService {
           'Accept': 'application/pdf, application/octet-stream, */*'
         }
       });
-      
+
       console.log('✅ API Service: Document PDF downloaded successfully');
       console.log('Response status:', response.status);
       console.log('Response headers:', response.headers);
       console.log('Response data size:', response.data.size);
-      
+
       return response; // Return full response to access headers
     } catch (error) {
       console.error('❌ API Service: Failed to download document PDF:', error);
@@ -799,60 +828,101 @@ class ApiService {
 
   async previewDocument(documentData) {
     try {
-      // console.log('📄 API Service: Previewing document...', documentData);
       const response = await this.api.post('/document-generation/preview_document/', documentData);
-      // console.log('✅ API Service: Document preview generated successfully:', response.data);
       return response.data;
     } catch (error) {
-      // console.error('❌ API Service: Failed to preview document:', error);
       throw error;
     }
   }
 
   async getMyDocuments() {
     try {
-      // console.log('📄 API Service: Fetching my documents...');
       const response = await this.api.get('/document-generation/my_documents/');
-      // console.log('✅ API Service: My documents fetched successfully:', response.data);
       return response.data;
     } catch (error) {
-      // console.error('❌ API Service: Failed to fetch my documents:', error);
       throw error;
     }
   }
 
   async sendDocumentEmail(documentId) {
     try {
-      // console.log('📄 API Service: Sending document email...', documentId);
       const response = await this.api.post(`/generated-documents/${documentId}/send_email/`);
-      // console.log('✅ API Service: Document email sent successfully:', response.data);
       return response.data;
     } catch (error) {
-      // console.error('❌ API Service: Failed to send document email:', error);
       throw error;
     }
   }
 
   async deleteGeneratedDocument(documentId) {
     try {
-      // console.log('📄 API Service: Deleting generated document...', documentId);
       const response = await this.api.delete(`/generated-documents/${documentId}/`);
-      // console.log('✅ API Service: Generated document deleted successfully');
       return response.data;
     } catch (error) {
-      // console.error('❌ API Service: Failed to delete generated document:', error);
       throw error;
     }
   }
 
   async getDocumentTemplates() {
     try {
-      // console.log('📄 API Service: Fetching document templates...');
       const response = await this.api.get('/document-templates/');
-      // console.log('✅ API Service: Document templates fetched successfully:', response.data);
       return response.data;
     } catch (error) {
-      // console.error('❌ API Service: Failed to fetch document templates:', error);
+      throw error;
+    }
+  }
+
+  // Department endpoints
+  async getDepartments(params = {}) {
+    try {
+      const response = await this.api.get('/departments/', { params });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getDepartment(id) {
+    try {
+      const response = await this.api.get(`/departments/${id}/`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getDepartmentDesignations(departmentId) {
+    try {
+      const response = await this.api.get(`/designations/by-department/${departmentId}/`)
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Designation endpoints
+  async getDesignations(params = {}) {
+    try {
+      const response = await this.api.get('/designations/', { params });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getDesignation(id) {
+    try {
+      const response = await this.api.get(`/designations/${id}/`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getDesignationsByDepartment(departmentId) {
+    try {
+      const response = await this.api.get(`/designations/by-department/${departmentId}/`);
+      return response.data;
+    } catch (error) {
       throw error;
     }
   }
@@ -860,9 +930,7 @@ class ApiService {
   // Resignation endpoints
   async getResignations(params = {}) {
     try {
-      // console.log('📋 API Service: Fetching resignations...', params);
       const response = await this.api.get('/resignations/', { params });
-      // console.log('✅ API Service: Resignations fetched successfully:', response.data);
       return response.data;
     } catch (error) {
       // console.error('❌ API Service: Failed to fetch resignations:', error);
@@ -872,9 +940,7 @@ class ApiService {
 
   async getResignation(id) {
     try {
-      // console.log('📋 API Service: Fetching resignation...', id);
       const response = await this.api.get(`/resignations/${id}/`);
-      // console.log('✅ API Service: Resignation fetched successfully:', response.data);
       return response.data;
     } catch (error) {
       // console.error('❌ API Service: Failed to fetch resignation:', error);
@@ -884,9 +950,7 @@ class ApiService {
 
   async getResignationStats() {
     try {
-      // console.log('📊 API Service: Fetching resignation stats...');
       const response = await this.api.get('/resignations/stats/');
-      // console.log('✅ API Service: Resignation stats fetched successfully:', response.data);
       return response.data;
     } catch (error) {
       // console.error('❌ API Service: Failed to fetch resignation stats:', error);
@@ -896,9 +960,7 @@ class ApiService {
 
   async approveResignation(id) {
     try {
-      // console.log('✅ API Service: Approving resignation...', id);
       const response = await this.api.post(`/resignations/${id}/approve/`);
-      // console.log('✅ API Service: Resignation approved successfully:', response.data);
       return response.data;
     } catch (error) {
       // console.error('❌ API Service: Failed to approve resignation:', error);
@@ -908,24 +970,18 @@ class ApiService {
 
   async rejectResignation(id, data) {
     try {
-      // console.log('❌ API Service: Rejecting resignation...', id, data);
       const response = await this.api.post(`/resignations/${id}/reject/`, data);
-      // console.log('✅ API Service: Resignation rejected successfully:', response.data);
       return response.data;
     } catch (error) {
-      // console.error('❌ API Service: Failed to reject resignation:', error);
       throw error;
     }
   }
 
   async createResignation(resignationData) {
     try {
-      // console.log('📝 API Service: Creating resignation...', resignationData);
       const response = await this.api.post('/resignations/', resignationData);
-      // console.log('✅ API Service: Resignation created successfully:', response.data);
       return response.data;
     } catch (error) {
-      // console.error('❌ API Service: Failed to create resignation:', error);
       throw error;
     }
   }

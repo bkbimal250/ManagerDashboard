@@ -9,6 +9,7 @@ import {
 import { Button } from '../Components';
 import { 
   PersonalInformation,
+  GovernmentID,
   EmploymentInformation,
   EmergencyContact,
   BankDetails,
@@ -35,6 +36,8 @@ const Profile = () => {
         address: user.address || '',
         date_of_birth: user.date_of_birth || '',
         gender: user.gender || '',
+        aadhaar_card: user.aadhaar_card || '',
+        pan_card: user.pan_card || '',
         employee_id: user.employee_id || '',
         department: user.department || '',
         designation: user.designation || '',
@@ -212,6 +215,13 @@ const Profile = () => {
             formData={formData}
             handleInputChange={handleInputChange}
             isEditing={isEditing}
+          />
+
+          <GovernmentID
+            formData={formData}
+            setFormData={setFormData}
+            isEditing={isEditing}
+            loading={loading}
           />
 
           <EmploymentInformation

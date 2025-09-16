@@ -1,8 +1,8 @@
 import React from 'react';
 import { Button } from '../../Components';
-import { Building2, RefreshCw, BarChart3 } from 'lucide-react';
+import { Building2, RefreshCw, BarChart3, Users, Clock, Calendar, FileText, Settings } from 'lucide-react';
 
-const DashboardHeader = ({ user, onRefresh, refreshing, onViewReports }) => {
+const DashboardHeader = ({ user, onRefresh, refreshing, onViewReports, onQuickAction }) => {
   return (
     <div className="page-header">
       <div className="flex justify-between items-center">
@@ -22,7 +22,39 @@ const DashboardHeader = ({ user, onRefresh, refreshing, onViewReports }) => {
             </div>
           )}
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2">
+          {/* Quick Navigation Buttons */}
+          <div className="hidden md:flex items-center space-x-2 mr-4">
+            <Button 
+              onClick={() => onQuickAction('employees')}
+              size="sm"
+              variant="outline"
+              className="flex items-center text-blue-600 hover:text-blue-700"
+            >
+              <Users className="h-4 w-4 mr-1" />
+              Employees
+            </Button>
+            <Button 
+              onClick={() => onQuickAction('attendance')}
+              size="sm"
+              variant="outline"
+              className="flex items-center text-green-600 hover:text-green-700"
+            >
+              <Clock className="h-4 w-4 mr-1" />
+              Attendance
+            </Button>
+            <Button 
+              onClick={() => onQuickAction('leaves')}
+              size="sm"
+              variant="outline"
+              className="flex items-center text-yellow-600 hover:text-yellow-700"
+            >
+              <Calendar className="h-4 w-4 mr-1" />
+              Leaves
+            </Button>
+          </div>
+          
+          {/* Main Action Buttons */}
           <Button 
             onClick={onRefresh}
             disabled={refreshing}

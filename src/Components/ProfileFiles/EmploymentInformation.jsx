@@ -60,7 +60,7 @@ const EmploymentInformation = ({ user, formData, handleInputChange, isEditing })
               placeholder="Enter department"
             />
           ) : (
-            <p className="text-sm text-gray-900 py-1">{user?.department || 'Not provided'}</p>
+            <p className="text-sm text-gray-900 py-1">{user?.department_name || 'Not provided'}</p>
           )}
         </div>
 
@@ -77,7 +77,7 @@ const EmploymentInformation = ({ user, formData, handleInputChange, isEditing })
               placeholder="Enter designation"
             />
           ) : (
-            <p className="text-sm text-gray-900 py-1">{user?.designation || 'Not provided'}</p>
+            <p className="text-sm text-gray-900 py-1">{user?.designation_name || 'Not provided'}</p>
           )}
         </div>
 

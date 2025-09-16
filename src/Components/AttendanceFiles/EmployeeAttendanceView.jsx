@@ -106,20 +106,21 @@ const EmployeeAttendanceView = ({ selectedEmployee }) => {
     setError(null);
     setSuccessMessage(null); // Clear any previous success messages
 
-    console.log('🔍 Fetching attendance for:', {
-      employeeId: selectedEmployee.id,
-      selectedEmployee: selectedEmployee,
-      startDate,
-      endDate,
-      year: currentYear,
-      month: currentMonth
-    });
+    // console.log('🔍 Fetching attendance for:', {
+    //   employeeId: selectedEmployee.id,
+    //   selectedEmployee: selectedEmployee,
+    //   startDate,
+    //   endDate,
+    //   year: currentYear,
+    //   month: currentMonth
+    // });
 
     try {
       // Check if we have authentication token
       const token = localStorage.getItem('access_token');
-      console.log('🔑 Auth token available:', !!token);
-      console.log('🔑 Token preview:', token ? `${token.substring(0, 20)}...` : 'None');
+
+      // console.log('🔑 Auth token available:', !!token);
+      // console.log('🔑 Token preview:', token ? `${token.substring(0, 20)}...` : 'None');
       
       // Test API connection first
       try {
@@ -166,17 +167,19 @@ const EmployeeAttendanceView = ({ selectedEmployee }) => {
           attendanceRate: statistics.attendance_rate || 0
         });
       } else {
-        console.error('❌ API response indicates failure:', response);
+        // console.error('❌ API response indicates failure:', response);
         setError('Failed to fetch attendance data');
       }
     } catch (error) {
       console.error('❌ Error fetching attendance:', error);
-      console.error('❌ Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        statusText: error.response?.statusText
-      });
+
+      // console.error('❌ Error details:', {
+      //   message: error.message,
+      //   response: error.response?.data,
+      //   status: error.response?.status,
+      //   statusText: error.response?.statusText
+      // });
+
       setError(`Error fetching attendance data: ${error.message}`);
     } finally {
       setLoading(false);
@@ -204,7 +207,9 @@ const EmployeeAttendanceView = ({ selectedEmployee }) => {
 
   // Handle status editing
   const handleEditClick = useCallback((row) => {
-    console.log('🔧 Starting edit for row:', row);
+
+    // console.log('🔧 Starting edit for row:', row);
+
     setEditingRow(row);
     setError(null); // Clear any previous errors
     setSuccessMessage(null); // Clear any previous success messages
@@ -245,15 +250,15 @@ const EmployeeAttendanceView = ({ selectedEmployee }) => {
       return;
     }
 
-    console.log('🔧 Updating attendance status:', {
-      employeeId: selectedEmployee.id,
-      date: editingRow.date,
-      dateType: typeof editingRow.date,
-      dateValue: editingRow.date,
-      status: editForm.status,
-      dayStatus: editForm.dayStatus,
-      notes: editForm.notes
-    });
+    // console.log('🔧 Updating attendance status:', {
+    //   employeeId: selectedEmployee.id,
+    //   date: editingRow.date,
+    //   dateType: typeof editingRow.date,
+    //   dateValue: editingRow.date,
+    //   status: editForm.status,
+    //   dayStatus: editForm.dayStatus,
+    //   notes: editForm.notes
+    // });
 
     try {
       // Ensure date is in YYYY-MM-DD format
@@ -441,7 +446,7 @@ const EmployeeAttendanceView = ({ selectedEmployee }) => {
             {selectedEmployee.first_name} {selectedEmployee.last_name} - Attendance
           </h2>
           <p className="text-gray-600">
-            Employee ID: {selectedEmployee.employee_id} • Department: {selectedEmployee.department}
+            Employee ID: {selectedEmployee.employee_id} • Department: {selectedEmployee.department_name || 'Not assigned'} • Designation: {selectedEmployee.designation_name || 'Not assigned'}
           </p>
         </div>
         <Button onClick={exportToCSV} className="bg-green-600 hover:bg-green-700">

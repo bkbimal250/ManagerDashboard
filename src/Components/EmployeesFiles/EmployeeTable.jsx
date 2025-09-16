@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, Button } from '../../Components';
+import { Card, Button } from '../index';
 import { 
   Edit, 
   Trash2, 
@@ -8,11 +8,13 @@ import {
   Users,
   Mail,
   Phone,
-  Building
+  Building,
+  Calendar,
+  Eye
 } from 'lucide-react';
 import { formatDateWithDay } from '../../utils/dateUtils';
 
-const EmployeeTable = ({ employees, onEdit, onDelete, getStatusBadge, getRoleIcon }) => {
+const EmployeeTable = ({ employees, onEdit, onDelete, onViewAttendance, onViewDetails, getStatusBadge, getRoleIcon }) => {
   return (
     <Card className="p-6">
       <div className="overflow-x-auto">
@@ -63,15 +65,15 @@ const EmployeeTable = ({ employees, onEdit, onDelete, getStatusBadge, getRoleIco
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-900">
-                    {employee.department && (
+                    {employee.department_name && (
                       <div className="flex items-center">
                         <Building className="h-3 w-3 mr-1 text-gray-400" />
-                        {employee.department}
+                        {employee.department_name}
                       </div>
                     )}
                   </div>
                   <div className="text-sm text-gray-500">
-                    {employee.designation || 'Not assigned'}
+                    {employee.designation_name || 'Not assigned'}
                   </div>
                   {employee.joining_date && (
                     <div className="text-xs text-gray-400">
@@ -90,6 +92,24 @@ const EmployeeTable = ({ employees, onEdit, onDelete, getStatusBadge, getRoleIco
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <div className="flex items-center space-x-2">
+                    <Button
+                      onClick={() => onViewDetails(employee)}
+                      size="sm"
+                      variant="outline"
+                      className="flex items-center text-green-600 hover:text-green-700"
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      View Details
+                    </Button>
+                    <Button
+                      onClick={() => onViewAttendance(employee)}
+                      size="sm"
+                      variant="outline"
+                      className="flex items-center text-blue-600 hover:text-blue-700"
+                    >
+                      <Calendar className="h-3 w-3 mr-1" />
+                      Attendance
+                    </Button>
                     <Button
                       onClick={() => onEdit(employee)}
                       size="sm"

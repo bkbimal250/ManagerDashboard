@@ -8,6 +8,10 @@
  * This is a fallback when WeasyPrint is not available on the server
  */
 export const generatePDFFromHTML = (htmlContent, filename = 'document.pdf') => {
+  if (typeof window === 'undefined') {
+    throw new Error('Window object not available for PDF generation');
+  }
+  
   // Create a new window for printing
   const printWindow = window.open('', '_blank');
   
@@ -16,7 +20,8 @@ export const generatePDFFromHTML = (htmlContent, filename = 'document.pdf') => {
   }
   
   // Write the HTML content to the new window
-  printWindow.document.write(`
+  if (printWindow.document && printWindow.document.write) {
+    printWindow.document.write(`
     <!DOCTYPE html>
     <html>
     <head>
@@ -66,15 +71,24 @@ export const generatePDFFromHTML = (htmlContent, filename = 'document.pdf') => {
     </body>
     </html>
   `);
+  } else {
+    throw new Error('Print window document.write not available');
+  }
   
-  printWindow.document.close();
+  if (printWindow.document) {
+    printWindow.document.close();
+  }
   
   // Auto-trigger print dialog after content loads
-  printWindow.onload = () => {
-    setTimeout(() => {
-      printWindow.print();
-    }, 500);
-  };
+  if (printWindow.onload !== undefined) {
+    printWindow.onload = () => {
+      setTimeout(() => {
+        if (printWindow.print) {
+          printWindow.print();
+        }
+      }, 500);
+    };
+  }
   
   return printWindow;
 };
@@ -84,22 +98,31 @@ export const generatePDFFromHTML = (htmlContent, filename = 'document.pdf') => {
  * Alternative when PDF generation is not available
  */
 export const downloadHTML = (htmlContent, filename = 'document.html') => {
-  const blob = new Blob([htmlContent], { type: 'text/html' });
-  const url = window.URL.createObjectURL(blob);
-  
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.style.display = 'none';
-  
-  document.body.appendChild(a);
-  a.click();
-  
-  // Cleanup
-  setTimeout(() => {
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-  }, 100);
+  if (typeof window !== 'undefined' && typeof document !== 'undefined' && typeof document.createElement === 'function') {
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = window.URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display = 'none';
+    
+    document.body.appendChild(a);
+    a.click();
+    
+    // Cleanup
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    }, 100);
+  } else {
+    console.error('DOM check failed for HTML download:', {
+      window: typeof window,
+      document: typeof document,
+      createElement: typeof document?.createElement
+    });
+    throw new Error('DOM not available for HTML download');
+  }
 };
 
 /**
@@ -130,8 +153,8 @@ export const downloadDocument = async (document, apiService) => {
       }
     }
     
-    // Check if we got HTML instead of PDF
-    if (contentType.includes('html') || blob.size === 0) {
+    // Only fallback to HTML if we actually received HTML content type
+    if (contentType.includes('text/html') && !contentType.includes('application/pdf')) {
       // Fallback: Generate PDF from HTML using browser
       generatePDFFromHTML(document.content, filename.replace('.pdf', ''));
       return {
@@ -141,21 +164,64 @@ export const downloadDocument = async (document, apiService) => {
       };
     }
     
-    // Download the PDF
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.style.display = 'none';
-    
-    document.body.appendChild(a);
-    a.click();
-    
-    // Cleanup
-    setTimeout(() => {
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    }, 100);
+    // Download the PDF - Try multiple methods
+    try {
+      // Method 1: Standard DOM approach
+      if (typeof window !== 'undefined' && typeof document !== 'undefined' && typeof document.createElement === 'function') {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.style.display = 'none';
+        
+        document.body.appendChild(a);
+        a.click();
+        
+        // Cleanup
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        }, 100);
+      } 
+      // Method 2: Direct URL approach
+      else if (typeof window !== 'undefined' && window.URL && window.URL.createObjectURL) {
+        const url = window.URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        
+        // Cleanup after a delay
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url);
+        }, 1000);
+      }
+      // Method 3: Fallback - direct window.open with blob
+      else if (typeof window !== 'undefined' && window.URL && window.URL.createObjectURL) {
+        const url = window.URL.createObjectURL(blob);
+        
+        // Try to open in new window/tab
+        const newWindow = window.open();
+        if (newWindow) {
+          newWindow.location.href = url;
+          // Cleanup after a delay
+          setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+          }, 1000);
+        } else {
+          throw new Error('Unable to open new window for download');
+        }
+      } else {
+        throw new Error('No download method available');
+      }
+    } catch (error) {
+      console.error('Download methods failed:', error);
+      console.error('DOM check failed:', {
+        window: typeof window,
+        document: typeof document,
+        createElement: typeof document?.createElement,
+        URL: typeof window?.URL,
+        createObjectURL: typeof window?.URL?.createObjectURL
+      });
+      throw new Error('All download methods failed');
+    }
     
     return {
       success: true,
@@ -166,14 +232,10 @@ export const downloadDocument = async (document, apiService) => {
   } catch (error) {
     console.error('Download failed:', error);
     
-    // Final fallback: Download as HTML
-    const htmlFilename = `${document.title.replace(/[^a-zA-Z0-9]/g, '_')}.html`;
-    downloadHTML(document.content, htmlFilename);
-    
     return {
-      success: true,
-      message: 'Document downloaded as HTML (PDF generation not available)',
-      type: 'html'
+      success: false,
+      message: 'Failed to download document. Please try again.',
+      type: 'error'
     };
   }
 };

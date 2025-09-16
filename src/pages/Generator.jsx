@@ -26,17 +26,38 @@ const Generator = () => {
     loadGeneratedDocuments();
   }, []);
 
+  // Debug: Log employees state changes
+
   const loadEmployees = async () => {
     try {
       setLoading(true);
+      console.log('🔄 Loading employees for document generation...');
+      console.log('🔄 Timestamp:', new Date().toISOString());
+      
       const data = await api.getEmployeesForDocumentGeneration();
-      setEmployees(data);
+      
+      // Ensure we have an array
+      let employeesArray = Array.isArray(data) ? data : [];
+      
+
+      setEmployees(employeesArray);
+      console.log('Employees state should now be set');
+      
+      // Force a re-render check
+      setTimeout(() => {
+
+      }, 100);
+      
+      showMessage('success', `Loaded ${employeesArray.length} employees successfully`);
     } catch (error) {
-      showMessage('error', 'Failed to load employees');
+      console.error('Error loading employees:', error);
+      const errorMessage = error.message || 'Failed to load employees';
+      showMessage('error', errorMessage);
     } finally {
       setLoading(false);
     }
   };
+
 
   const loadGeneratedDocuments = async () => {
     try {
@@ -97,7 +118,7 @@ const Generator = () => {
 
   const handleDownloadDocument = async (doc) => {
     try {
-      console.log('Starting download for document:', doc.id);
+    
       
       // Use the enhanced download function with fallbacks
       const result = await downloadDocument(doc, api);
@@ -185,13 +206,16 @@ const Generator = () => {
 
       {/* Tab Content */}
       {activeTab === 'generate' && (
-        <DocumentForm
-          employees={employees}
-          loading={loading}
-          onGenerate={handleGenerate}
-          onPreview={handlePreview}
-          message={message}
-        />
+        <>
+        
+          <DocumentForm
+            employees={employees}
+            loading={loading}
+            onGenerate={handleGenerate}
+            onPreview={handlePreview}
+            message={message}
+          />
+        </>
       )}
 
       {activeTab === 'documents' && (

@@ -16,6 +16,7 @@ class WebSocketService {
       // Use native WebSocket instead of Socket.IO for Django Channels
       // Use the same base URL as the API service
       const baseUrl = 'https://company.d0s369.co.in';
+      // const baseUrl = 'http://localhost:8000';
       const wsUrl = baseUrl.replace('https://', 'wss://').replace('http://', 'ws://') + '/ws/attendance/';
       this.socket = new WebSocket(wsUrl);
       
@@ -23,7 +24,9 @@ class WebSocketService {
       this.connectionStatus = 'connecting';
       
     } catch (error) {
+      console.warn('WebSocket connection failed, continuing without real-time updates:', error);
       this.connectionStatus = 'error';
+      // Don't throw error, just log and continue
     }
   }
 
@@ -65,8 +68,15 @@ class WebSocketService {
     };
 
     this.socket.onerror = (error) => {
-      // console.error('WebSocket: Connection error:', error);
+      console.error('WebSocket: Connection error:', error);
       this.connectionStatus = 'error';
+      
+      // Check if this is a CSP violation
+      if (error.target && error.target.readyState === WebSocket.CLOSED) {
+        console.warn('WebSocket blocked by Content Security Policy. Real-time updates disabled.');
+        // Don't attempt reconnection for CSP violations
+        this.reconnectAttempts = this.maxReconnectAttempts;
+      }
     };
   }
 
@@ -206,6 +216,29 @@ class WebSocketService {
       status: this.connectionStatus,
       reconnectAttempts: this.reconnectAttempts
     };
+  }
+
+  /**
+   * Check if WebSocket connections are supported and not blocked
+   */
+  isWebSocketSupported() {
+    return typeof WebSocket !== 'undefined' && 
+           this.connectionStatus !== 'error' &&
+           this.reconnectAttempts < this.maxReconnectAttempts;
+  }
+
+  /**
+   * Get connection status with CSP awareness
+   */
+  getConnectionStatusWithCSP() {
+    const status = this.connectionStatus;
+    
+    // If we've hit max reconnection attempts, it's likely CSP blocking
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      return 'blocked_by_csp';
+    }
+    
+    return status;
   }
 }
 

@@ -182,32 +182,19 @@ const Resignations = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Resignation Management</h1>
-          <p className="text-gray-600">Manage employee resignation requests from your office</p>
+          <h1 className="text-lg font-semibold text-gray-900">Resignation Management</h1>
+          <p className="text-xs text-gray-600">Manage employee resignation requests from your office</p>
         </div>
         <div className="flex space-x-2">
           <button
             onClick={handleRefresh}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors duration-200"
+            className="px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors duration-200 text-sm"
           >
             Refresh
-          </button>
-          <button
-            onClick={() => {
-              console.log('🔍 Debug Info:');
-              console.log('  - Current user:', user);
-              console.log('  - Auth token exists:', !!localStorage.getItem('access_token'));
-              console.log('  - Current resignations:', resignations);
-              console.log('  - Current stats:', stats);
-              console.log('  - Loading state:', loading);
-            }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200"
-          >
-            Debug
           </button>
         </div>
       </div>

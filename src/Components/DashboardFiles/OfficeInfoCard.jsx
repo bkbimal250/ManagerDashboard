@@ -6,31 +6,18 @@ const OfficeInfoCard = ({ office, manager }) => {
   if (!office) return null;
 
   return (
-    <Card className="shadow-lg border-2 border-gray-100">
-      <div className="card-header">
-        <h2 className="text-xl font-bold text-gray-900">Office Information</h2>
+    <Card className="shadow-lg border border-gray-200">
+      <div className="p-4 border-b border-gray-200">
+        <h2 className="text-lg font-semibold text-gray-900">Manager Information</h2>
       </div>
-      <div className="card-body">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* <div>
-            <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
-              <Building2 className="h-5 w-5 mr-2 text-blue-600" />
-              Office Details
-            </h3>
-            <div className="space-y-3 text-sm text-gray-600">
-              <p><strong>Name:</strong> {office.name}</p>
-              <p><strong>Address:</strong> {office.address}</p>
-              <p><strong>Email:</strong> {office.email}</p>
-              <p><strong>Phone:</strong> {office.phone}</p>
-            </div>
-          </div> */}
-          <div>
-            <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
-              <Users className="h-5 w-5 mr-2 text-green-600" />
-              Manager Details
-            </h3>
-            <div className="space-y-3 text-sm text-gray-600">
-              <p><strong>Name:</strong> {manager?.first_name} {manager?.last_name}</p>
+      <div className="p-4">
+        <div className="flex items-center">
+          <div className="p-2 rounded-lg bg-green-100 text-green-600">
+            <Users className="h-5 w-5" />
+          </div>
+          <div className="ml-3">
+            <h3 className="font-medium text-gray-900">{manager?.first_name} {manager?.last_name}</h3>
+            <div className="text-sm text-gray-600 space-y-1">
               <p><strong>Email:</strong> {manager?.email}</p>
               <p><strong>Phone:</strong> {manager?.phone || 'Not specified'}</p>
               <p><strong>Employee ID:</strong> {manager?.employee_id || 'Not specified'}</p>

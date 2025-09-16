@@ -59,7 +59,7 @@ const MonthlyReport = () => {
             name: `${employee.first_name} ${employee.last_name}`,
             employee_id: employee.employee_id || 'N/A',
             office: officeInfo.name,
-            department: employee.department || 'N/A',
+            department: employee.department_name || 'N/A',
             ...response.statistics
           };
         } catch (error) {
@@ -69,7 +69,7 @@ const MonthlyReport = () => {
             name: `${employee.first_name} ${employee.last_name}`,
             employee_id: employee.employee_id || 'N/A',
             office: officeInfo.name,
-            department: employee.department || 'N/A',
+            department: employee.department_name || 'N/A',
             total_days_in_month: 0,
             present_days: 0,
             absent_days: 0,

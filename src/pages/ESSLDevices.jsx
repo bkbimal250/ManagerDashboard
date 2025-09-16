@@ -8,19 +8,10 @@ import {
   Settings, 
   AlertCircle,
   CheckCircle,
-  Clock,
-  MapPin,
   Building2,
   Activity,
-  Download,
-  Upload,
   UserPlus,
   TestTube,
-  Info,
-  Play,
-  Pause,
-  Trash2,
-  Edit,
   Plus,
   FileText
 } from 'lucide-react';
@@ -154,7 +145,7 @@ const ESSLDevices = () => {
       if (response.success) {
         showMessage('success', 'Real users exported to CSV files successfully! Check the exports directory.');
         // Show detailed output in console for debugging
-        console.log('Export output:', response.output);
+        // console.log('Export output:', response.output);
       } else {
         showMessage('error', response.message || 'Failed to export users to CSV');
       }

@@ -117,6 +117,7 @@ const ReportTable = ({ data, summary }) => {
     { key: 'date', label: 'Date', sortable: true, icon: Calendar },
     { key: 'user__first_name', label: 'Employee', sortable: true, icon: User },
     { key: 'user__employee_id', label: 'Employee ID', sortable: true },
+    { key: 'user__department__name', label: 'Department', sortable: true, icon: Building2 },
     { key: 'user__office__name', label: 'Office', sortable: true, icon: Building2 },
     { key: 'check_in_time', label: 'Check In', sortable: true, icon: Clock },
     { key: 'check_out_time', label: 'Check Out', sortable: true, icon: Clock },
@@ -136,6 +137,9 @@ const ReportTable = ({ data, summary }) => {
       
       case 'user__first_name':
         return `${record.user__first_name || ''} ${record.user__last_name || ''}`.trim() || '-';
+      
+      case 'user__department__name':
+        return value || 'Not assigned';
       
       case 'status':
         return (

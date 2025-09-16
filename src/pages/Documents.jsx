@@ -51,10 +51,9 @@ const Documents = () => {
         page_size: itemsPerPage
       });
       
-      console.log('Documents API Response:', response); // Debug log
       
       const documentsData = response.results || response;
-      console.log('Documents Data:', documentsData); // Debug log
+      // console.log('Documents Data:', documentsData); // Debug log
       
       // Debug each document
       if (Array.isArray(documentsData)) {

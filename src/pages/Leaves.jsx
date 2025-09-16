@@ -188,42 +188,44 @@ const Leaves = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Leave Management</h1>
-          <p className="text-gray-600">
+          <h1 className="text-lg font-semibold text-gray-900">Leave Management</h1>
+          <p className="text-xs text-gray-600">
             {activeTab === 'office' 
               ? 'Review and manage leave requests from your employees' 
               : 'Manage your own leave requests'
             }
           </p>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2">
           <Button
             onClick={() => setShowApplyModal(true)}
-            className="flex items-center space-x-2"
+            size="sm"
+            className="flex items-center space-x-1"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-3 w-3" />
             <span>Apply Leave</span>
           </Button>
           <Button
             onClick={fetchLeaves}
             variant="outline"
-            className="flex items-center space-x-2"
+            size="sm"
+            className="flex items-center space-x-1"
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className="h-3 w-3" />
             <span>Refresh</span>
           </Button>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+      <div className="flex space-x-1 bg-gray-100 p-0.5 rounded-md">
         <button
           onClick={() => setActiveTab('office')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+          className={`flex-1 py-1.5 px-3 rounded text-xs font-medium transition-colors ${
             activeTab === 'office'
               ? 'bg-white text-blue-600 shadow-sm'
               : 'text-gray-600 hover:text-gray-900'
@@ -233,7 +235,7 @@ const Leaves = () => {
         </button>
         <button
           onClick={() => setActiveTab('my')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+          className={`flex-1 py-1.5 px-3 rounded text-xs font-medium transition-colors ${
             activeTab === 'my'
               ? 'bg-white text-blue-600 shadow-sm'
               : 'text-gray-600 hover:text-gray-900'
@@ -244,71 +246,71 @@ const Leaves = () => {
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card className="p-3">
           <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <CalendarDays className="h-6 w-6 text-blue-600" />
+            <div className="p-1.5 bg-blue-100 rounded-md">
+              <CalendarDays className="h-4 w-4 text-blue-600" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+            <div className="ml-3">
+              <p className="text-xs font-medium text-gray-600">Total</p>
+              <p className="text-lg font-bold text-gray-900">{stats.total}</p>
             </div>
           </div>
         </Card>
-        <Card className="p-4">
+        <Card className="p-3">
           <div className="flex items-center">
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <Clock className="h-6 w-6 text-yellow-600" />
+            <div className="p-1.5 bg-yellow-100 rounded-md">
+              <Clock className="h-4 w-4 text-yellow-600" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Pending</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.pending}</p>
+            <div className="ml-3">
+              <p className="text-xs font-medium text-gray-600">Pending</p>
+              <p className="text-lg font-bold text-gray-900">{stats.pending}</p>
             </div>
           </div>
         </Card>
-        <Card className="p-4">
+        <Card className="p-3">
           <div className="flex items-center">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <CheckCircle className="h-6 w-6 text-green-600" />
+            <div className="p-1.5 bg-green-100 rounded-md">
+              <CheckCircle className="h-4 w-4 text-green-600" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Approved</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.approved}</p>
+            <div className="ml-3">
+              <p className="text-xs font-medium text-gray-600">Approved</p>
+              <p className="text-lg font-bold text-gray-900">{stats.approved}</p>
             </div>
           </div>
         </Card>
-        <Card className="p-4">
+        <Card className="p-3">
           <div className="flex items-center">
-            <div className="p-2 bg-red-100 rounded-lg">
-              <AlertCircle className="h-6 w-6 text-red-600" />
+            <div className="p-1.5 bg-red-100 rounded-md">
+              <AlertCircle className="h-4 w-4 text-red-600" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Rejected</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.rejected}</p>
+            <div className="ml-3">
+              <p className="text-xs font-medium text-gray-600">Rejected</p>
+              <p className="text-lg font-bold text-gray-900">{stats.rejected}</p>
             </div>
           </div>
         </Card>
       </div>
 
       {/* Filters */}
-      <Card className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <Card className="p-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 h-3 w-3" />
             <Input
               type="text"
               placeholder="Search employees or leave types..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-8 text-sm"
             />
           </div>
           <div>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-2 py-1.5 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
             >
               <option value="">All Status</option>
               <option value="pending">Pending</option>
@@ -324,6 +326,7 @@ const Leaves = () => {
                 setStatusFilter('');
               }}
               variant="outline"
+              size="sm"
               className="w-full"
             >
               Clear Filters
@@ -333,65 +336,65 @@ const Leaves = () => {
       </Card>
 
       {/* Leaves Table */}
-      <Card className="p-6">
+      <Card className="p-3">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Leave Type</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date Range</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Days</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Leave Type</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date Range</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Days</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredLeaves.map((leave) => (
                 <tr key={leave.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 py-3 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                        <User className="h-4 w-4 text-blue-600" />
+                      <div className="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center">
+                        <User className="h-3 w-3 text-blue-600" />
                       </div>
-                      <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900">
+                      <div className="ml-2">
+                        <div className="text-xs font-medium text-gray-900">
                           {leave.user?.first_name} {leave.user?.last_name}
                         </div>
-                        <div className="text-sm text-gray-500">
+                        <div className="text-xs text-gray-500">
                           {leave.user?.employee_id}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 py-3 whitespace-nowrap">
                     <div className="flex items-center">
                       {getLeaveTypeIcon(leave.leave_type)}
-                      <span className="ml-2 text-sm text-gray-900">
+                      <span className="ml-1 text-xs text-gray-900">
                         {getLeaveTypeLabel(leave.leave_type)}
                       </span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-900">
                     {formatDate(leave.start_date)} - {formatDate(leave.end_date)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-900">
                     {leave.total_days || 1} days
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(leave.status)}`}>
+                  <td className="px-3 py-3 whitespace-nowrap">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(leave.status)}`}>
                       <span className="mr-1">{getStatusIcon(leave.status)}</span>
                       {leave.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center space-x-2">
+                  <td className="px-3 py-3 whitespace-nowrap text-xs font-medium">
+                    <div className="flex items-center space-x-1">
                       {activeTab === 'office' && leave.status === 'pending' && (
                         <>
                           <Button
                             onClick={() => handleApprove(leave.id)}
                             size="sm"
-                            className="flex items-center bg-green-600 hover:bg-green-700"
+                            className="flex items-center bg-green-600 hover:bg-green-700 text-xs px-2 py-1"
                           >
                             <Check className="h-3 w-3 mr-1" />
                             Approve
@@ -400,7 +403,7 @@ const Leaves = () => {
                             onClick={() => handleReject(leave.id)}
                             size="sm"
                             variant="outline"
-                            className="flex items-center text-red-600 hover:text-red-700"
+                            className="flex items-center text-red-600 hover:text-red-700 text-xs px-2 py-1"
                           >
                             <X className="h-3 w-3 mr-1" />
                             Reject
@@ -414,7 +417,7 @@ const Leaves = () => {
                         }}
                         size="sm"
                         variant="outline"
-                        className="flex items-center"
+                        className="flex items-center text-xs px-2 py-1"
                       >
                         <Eye className="h-3 w-3 mr-1" />
                         View

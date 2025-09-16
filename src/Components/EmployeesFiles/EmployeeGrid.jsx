@@ -61,16 +61,16 @@ const EmployeeGrid = ({ employees, onEdit, onDelete, getStatusBadge, getRoleIcon
                   {employee.phone}
                 </div>
               )}
-              {employee.department && (
+              {employee.department_name && (
                 <div className="flex items-center text-sm text-gray-600">
                   <Building className="h-4 w-4 mr-2" />
-                  {employee.department}
+                  {employee.department_name}
                 </div>
               )}
-              {employee.designation && (
+              {employee.designation_name && (
                 <div className="flex items-center text-sm text-gray-600">
                   <User className="h-4 w-4 mr-2" />
-                  {employee.designation}
+                  {employee.designation_name}
                 </div>
               )}
               {employee.joining_date && (

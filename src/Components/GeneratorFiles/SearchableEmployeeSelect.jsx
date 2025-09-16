@@ -6,7 +6,7 @@ const SearchableEmployeeSelect = ({
   value, 
   onChange, 
   error, 
-  placeholder = "Search and select employee...",
+  placeholder = "Search and select employee by name, ID, or department...",
   className = ""
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -15,18 +15,31 @@ const SearchableEmployeeSelect = ({
   const dropdownRef = useRef(null);
   const searchInputRef = useRef(null);
 
+  // Helper function to get full name
+  const getFullName = (emp) => {
+    if (emp.name) return emp.name;
+    if (emp.first_name && emp.last_name) return `${emp.first_name} ${emp.last_name}`;
+    if (emp.first_name) return emp.first_name;
+    if (emp.last_name) return emp.last_name;
+    return 'Unknown Employee';
+  };
+
   // Filter employees based on search term
   const filteredEmployees = employees.filter(emp => {
     if (!searchTerm) return true;
     const searchLower = searchTerm.toLowerCase();
+    const fullName = getFullName(emp);
     return (
-      emp.name?.toLowerCase().includes(searchLower) ||
+      fullName.toLowerCase().includes(searchLower) ||
+      emp.first_name?.toLowerCase().includes(searchLower) ||
+      emp.last_name?.toLowerCase().includes(searchLower) ||
       emp.employee_id?.toLowerCase().includes(searchLower) ||
       emp.email?.toLowerCase().includes(searchLower) ||
-      emp.department?.toLowerCase().includes(searchLower) ||
-      emp.designation?.toLowerCase().includes(searchLower)
+      emp.department_name?.toLowerCase().includes(searchLower) ||
+      emp.designation_name?.toLowerCase().includes(searchLower)
     );
   });
+
 
   // Get selected employee
   const selectedEmployee = employees.find(emp => emp.id === value);
@@ -131,10 +144,10 @@ const SearchableEmployeeSelect = ({
                 <User className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-gray-900 truncate">
-                    {selectedEmployee.name}
+                    {getFullName(selectedEmployee)}
                   </div>
                   <div className="text-xs text-gray-500 truncate">
-                    {selectedEmployee.employee_id} • {selectedEmployee.department || 'No Department'}
+                    {selectedEmployee.employee_id} • {selectedEmployee.department_name || 'No Department'}
                   </div>
                 </div>
               </div>
@@ -175,7 +188,7 @@ const SearchableEmployeeSelect = ({
                 type="text"
                 value={searchTerm}
                 onChange={handleSearchChange}
-                placeholder="Search by name, ID, email, department..."
+                placeholder="Search by name, ID, email, department, designation..."
                 className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -199,10 +212,10 @@ const SearchableEmployeeSelect = ({
                     <User className="w-4 h-4 text-gray-400 mr-3 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-gray-900 truncate">
-                        {employee.name}
+                        {getFullName(employee)}
                       </div>
                       <div className="text-xs text-gray-500 truncate">
-                        {employee.employee_id} • {employee.department || 'No Department'} • {employee.designation || 'No Designation'}
+                        {employee.employee_id} • {employee.department_name || 'No Department'} • {employee.designation_name || 'No Designation'}
                       </div>
                       {employee.email && (
                         <div className="text-xs text-gray-400 truncate">

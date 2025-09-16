@@ -13,12 +13,14 @@ import {
   Trash2,
   UserCheck,
   Shield,
-  Plus
+  Plus,
+  Calendar,
+  Eye
 } from 'lucide-react';
 import { formatDateWithDay } from '../../utils/dateUtils';
 import api from '../../services/api';
 
-const EmployeeList = ({ onEdit, onDelete, onCreate }) => {
+const EmployeeList = ({ onEdit, onDelete, onCreate, onViewAttendance, onViewDetails }) => {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -37,6 +39,26 @@ const EmployeeList = ({ onEdit, onDelete, onCreate }) => {
     name: '',
     id: ''
   });
+  const [departments, setDepartments] = useState([]);
+
+  // Fetch departments
+  const fetchDepartments = useCallback(async () => {
+    try {
+      const response = await api.getDepartments();
+      const data = response.data || response;
+      const departmentsData = data.results || data;
+      
+      if (Array.isArray(departmentsData)) {
+        setDepartments(departmentsData);
+      } else {
+        console.warn('Departments data is not an array:', departmentsData);
+        setDepartments([]);
+      }
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+      setDepartments([]);
+    }
+  }, []);
 
   // Fetch employees with pagination and filters
   const fetchEmployees = useCallback(async () => {
@@ -143,8 +165,9 @@ const EmployeeList = ({ onEdit, onDelete, onCreate }) => {
 
   // Fetch data when component mounts or dependencies change
   useEffect(() => {
+    fetchDepartments();
     fetchEmployees();
-  }, [fetchEmployees]);
+  }, [fetchDepartments, fetchEmployees]);
 
   return (
     <div className="space-y-6">
@@ -184,11 +207,9 @@ const EmployeeList = ({ onEdit, onDelete, onCreate }) => {
             onChange={(e) => handleFilterChange('department', e.target.value)}
           >
             <option value="">All Departments</option>
-            <option value="IT">IT</option>
-            <option value="HR">HR</option>
-            <option value="Finance">Finance</option>
-            <option value="Marketing">Marketing</option>
-            <option value="Operations">Operations</option>
+            {departments.map(dept => (
+              <option key={dept.id} value={dept.name}>{dept.name}</option>
+            ))}
           </Select>
           
           <Select
@@ -302,15 +323,15 @@ const EmployeeList = ({ onEdit, onDelete, onCreate }) => {
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {employee.department && (
+                        {employee.department_name && (
                           <div className="flex items-center">
                             <Building className="h-3 w-3 mr-1 text-gray-400" />
-                            {employee.department}
+                            {employee.department_name}
                           </div>
                         )}
                       </div>
                       <div className="text-sm text-gray-500">
-                        {employee.designation || 'Not assigned'}
+                        {employee.designation_name || 'Not assigned'}
                       </div>
                       {employee.joining_date && (
                         <div className="text-xs text-gray-400">
@@ -325,6 +346,24 @@ const EmployeeList = ({ onEdit, onDelete, onCreate }) => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
+                        <Button
+                          onClick={() => onViewDetails(employee)}
+                          size="sm"
+                          variant="outline"
+                          className="flex items-center text-green-600 hover:text-green-700"
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          View Details
+                        </Button>
+                        <Button
+                          onClick={() => onViewAttendance(employee)}
+                          size="sm"
+                          variant="outline"
+                          className="flex items-center text-blue-600 hover:text-blue-700"
+                        >
+                          <Calendar className="h-3 w-3 mr-1" />
+                          Attendance
+                        </Button>
                         <Button
                           onClick={() => onEdit(employee)}
                           size="sm"

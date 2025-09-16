@@ -1,8 +1,8 @@
 import React from 'react';
-import { Card } from '../../Components';
-import { Activity, Calendar, CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import { Card, Button } from '../../Components';
+import { Calendar, CheckCircle, AlertCircle, Clock, ArrowRight, Eye } from 'lucide-react';
 
-const RecentActivitySection = ({ recentAttendance, pendingLeaves }) => {
+const RecentActivitySection = ({ pendingLeaves, onViewLeaves }) => {
   const getStatusBadge = (status) => {
     const badges = {
       present: 'bg-green-100 text-green-800',
@@ -29,74 +29,56 @@ const RecentActivitySection = ({ recentAttendance, pendingLeaves }) => {
 
   return (
     <div className="content-grid">
-      {/* Recent Attendance */}
-      <Card className="shadow-lg border-2 border-gray-100">
-        <div className="card-header">
-          <h2 className="text-xl font-bold text-gray-900">Recent Attendance</h2>
-        </div>
-        <div className="card-body">
-          <div className="space-y-4">
-            {recentAttendance.length > 0 ? (
-              recentAttendance.map((record) => (
-                <div key={record.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200 hover:shadow-md transition-all duration-200">
-                  <div className="flex items-center">
-                    <div className={`p-3 rounded-xl ${getStatusBadge(record.status)}`}>
-                      {getStatusIcon(record.status)}
-                    </div>
-                    <div className="ml-4">
-                      <p className="font-semibold text-gray-900">
-                        {record.user?.first_name} {record.user?.last_name}
-                      </p>
-                      <p className="text-sm text-gray-600">{record.date}</p>
-                    </div>
-                  </div>
-                  <span className={`px-3 py-1.5 text-xs font-semibold rounded-full ${getStatusBadge(record.status)}`}>
-                    {record.status}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-8">
-                <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No recent attendance records</p>
-              </div>
-            )}
+      {/* Pending Leave Requests */}
+      <Card className="shadow-lg border border-gray-200">
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-gray-900">Pending Leave Requests</h2>
+            <Button
+              onClick={onViewLeaves}
+              size="sm"
+              variant="outline"
+              className="flex items-center text-blue-600 hover:text-blue-700"
+            >
+              <Eye className="h-4 w-4 mr-1" />
+              View All
+            </Button>
           </div>
         </div>
-      </Card>
-
-      {/* Pending Leave Requests */}
-      <Card className="shadow-lg border-2 border-gray-100">
-        <div className="card-header">
-          <h2 className="text-xl font-bold text-gray-900">Pending Leave Requests</h2>
-        </div>
-        <div className="card-body">
-          <div className="space-y-4">
+        <div className="p-4">
+          <div className="space-y-3">
             {pendingLeaves.length > 0 ? (
               pendingLeaves.map((leave) => (
-                <div key={leave.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200 hover:shadow-md transition-all duration-200">
+                <div 
+                  key={leave.id} 
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 hover:shadow-sm transition-all duration-200 cursor-pointer group"
+                  onClick={() => onViewLeaves(leave)}
+                >
                   <div className="flex items-center">
-                    <div className={`p-3 rounded-xl ${getStatusBadge(leave.status)}`}>
+                    <div className={`p-2 rounded-lg ${getStatusBadge(leave.status)}`}>
                       {getStatusIcon(leave.status)}
                     </div>
-                    <div className="ml-4">
-                      <p className="font-semibold text-gray-900">
+                    <div className="ml-3">
+                      <p className="font-medium text-gray-900 text-sm">
                         {leave.user?.first_name} {leave.user?.last_name}
                       </p>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-xs text-gray-600">
                         {leave.start_date} - {leave.end_date}
                       </p>
                     </div>
                   </div>
-                  <span className={`px-3 py-1.5 text-xs font-semibold rounded-full ${getStatusBadge(leave.status)}`}>
-                    {leave.leave_type}
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(leave.status)}`}>
+                      {leave.leave_type}
+                    </span>
+                    <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
+                  </div>
                 </div>
               ))
             ) : (
-              <div className="text-center py-8">
-                <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No pending leave requests</p>
+              <div className="text-center py-6">
+                <Calendar className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">No pending leave requests</p>
               </div>
             )}
           </div>

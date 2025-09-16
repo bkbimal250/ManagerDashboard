@@ -28,7 +28,7 @@ const AttendanceTable = ({ attendanceRecords, onEdit, getStatusBadge, formatDate
 
   // Get late status color
   const getLateStatusColor = (isLate) => {
-    return isLate ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800';
+    return isLate ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800';
   };
 
   return (
@@ -57,10 +57,10 @@ const AttendanceTable = ({ attendanceRecords, onEdit, getStatusBadge, formatDate
                     </div>
                     <div className="ml-4">
                       <div className="text-sm font-medium text-gray-900">
-                        {record.employee?.first_name} {record.employee?.last_name}
+                        {record.user?.first_name} {record.user?.last_name}
                       </div>
                       <div className="text-sm text-gray-500">
-                        ID: {record.employee?.employee_id}
+                        ID: {record.user?.employee_id}
                       </div>
                     </div>
                   </div>
@@ -74,13 +74,13 @@ const AttendanceTable = ({ attendanceRecords, onEdit, getStatusBadge, formatDate
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center text-sm text-gray-900">
                     <Clock className="h-4 w-4 mr-2" />
-                    {record.check_in ? formatTime(record.check_in) : 'Not checked in'}
+                    {record.check_in_time ? formatTime(record.check_in_time) : 'Not checked in'}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center text-sm text-gray-900">
                     <Clock className="h-4 w-4 mr-2" />
-                    {record.check_out ? formatTime(record.check_out) : 'Not checked out'}
+                    {record.check_out_time ? formatTime(record.check_out_time) : 'Not checked out'}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -98,19 +98,19 @@ const AttendanceTable = ({ attendanceRecords, onEdit, getStatusBadge, formatDate
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center space-x-2">
                     <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                      record.is_late ? 'bg-orange-100' : 'bg-gray-100'
+                      record.is_late ? 'bg-orange-100' : 'bg-green-100'
                     }`}>
                       {record.is_late ? (
                         <AlertTriangle className="w-3 h-3 text-orange-600" />
                       ) : (
-                        <CheckCircle className="w-3 h-3 text-gray-600" />
+                        <CheckCircle className="w-3 h-3 text-green-600" />
                       )}
                     </div>
                     <div>
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${getLateStatusColor(record.is_late)}`}>
                         {record.is_late ? 'Late' : 'On Time'}
                       </span>
-                      {record.is_late && record.late_minutes && (
+                      {record.is_late && record.late_minutes > 0 && (
                         <div className="text-xs text-orange-600 mt-1">
                           {record.late_minutes} min late
                         </div>
